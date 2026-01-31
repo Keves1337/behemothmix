@@ -272,6 +272,37 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
           </TabsList>
 
           <TabsContent value="upload" className="flex-1 flex flex-col min-h-0 mt-4">
+            {/* Quick Spotify Sync */}
+            <div className="mb-4 p-3 bg-[hsl(142,70%,45%)]/10 border border-[hsl(142,70%,45%)]/30 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <Disc className="w-4 h-4 text-[hsl(142,70%,45%)]" />
+                <span className="text-sm font-medium">Quick Spotify Sync</span>
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Paste Spotify playlist URL..."
+                  value={spotifyUrl}
+                  onChange={(e) => setSpotifyUrl(e.target.value)}
+                  className="flex-1 text-sm h-8"
+                />
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="gap-1.5 h-8 bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-black"
+                  disabled={!spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)}
+                  onClick={() => {
+                    const playlistId = spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)?.[1];
+                    if (playlistId) {
+                      window.open(`spotify:playlist:${playlistId}`, '_blank');
+                    }
+                  }}
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Open in Spotify
+                </Button>
+              </div>
+            </div>
+
             {/* Album Info */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
