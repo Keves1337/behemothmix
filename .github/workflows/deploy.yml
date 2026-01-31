@@ -21,20 +21,19 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: 20
-          cache: 'npm'
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: bun install
 
       - name: Build
-        run: npm run build
+        run: bun run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://zfjngtqsuturvruccxvb.supabase.co' }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpmam5ndHFzdXR1cnZydWNjeHZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NTA2MjQsImV4cCI6MjA4NTQyNjYyNH0.Ilh7YIN8XMY5tgaoDXB8rn4g7FGTa3fo-xueCLtavs4' }}
+          VITE_SUPABASE_URL: 'https://zfjngtqsuturvruccxvb.supabase.co'
+          VITE_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpmam5ndHFzdXR1cnZydWNjeHZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NTA2MjQsImV4cCI6MjA4NTQyNjYyNH0.Ilh7YIN8XMY5tgaoDXB8rn4g7FGTa3fo-xueCLtavs4'
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
