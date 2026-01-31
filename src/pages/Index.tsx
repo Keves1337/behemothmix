@@ -241,6 +241,9 @@ const Index = () => {
               : 'Pro Features: Hot Cues • Loops • Beat Jump • Smart Auto-Mix • Key Lock • Slip Mode'
             }
           </span>
+          <span className="text-center text-muted-foreground/70">
+            Developed, Designed & Tested by <span className="text-primary font-semibold">Johnatan Milrad</span>
+          </span>
           <span className="font-mono">
             {autoMix.enabled ? 'AUTO-MIX ACTIVE' : midi.isSupported ? 'Web MIDI Ready' : 'Serato/Rekordbox Style'}
           </span>
