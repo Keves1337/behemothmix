@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useDJController } from '@/hooks/useDJController';
+import { useDJWithAudio } from '@/hooks/useDJWithAudio';
 import { useDDJSX1 } from '@/hooks/useDDJSX1';
 import Header from '@/components/dj/Header';
 import Deck from '@/components/dj/Deck';
@@ -29,7 +29,9 @@ const Index = () => {
     setLoop,
     toggleLoop,
     beatJump,
-  } = useDJController();
+    deckAHasAudio,
+    deckBHasAudio,
+  } = useDJWithAudio();
 
   // Deck A handlers
   const onDeckAPlay = useCallback(() => {
@@ -188,6 +190,7 @@ const Index = () => {
             onToggleLoop={() => toggleLoop('a')}
             onBeatJump={(dir) => beatJump('a', dir)}
             onTrackDrop={(track) => loadTrackToDeck(track, 'a')}
+            hasAudio={deckAHasAudio}
           />
           <EffectsPanel deck="a" />
         </div>
@@ -234,6 +237,7 @@ const Index = () => {
             onToggleLoop={() => toggleLoop('b')}
             onBeatJump={(dir) => beatJump('b', dir)}
             onTrackDrop={(track) => loadTrackToDeck(track, 'b')}
+            hasAudio={deckBHasAudio}
           />
           <EffectsPanel deck="b" />
         </div>

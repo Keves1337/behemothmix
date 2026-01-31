@@ -266,7 +266,7 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
       return;
     }
 
-    // Apply album artist if set
+    // Apply album artist if set and include audio file
     const tracksToImport: Track[] = pendingTracks.map(t => ({
       id: t.id,
       title: t.title,
@@ -274,6 +274,7 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
       bpm: t.bpm,
       duration: t.duration || 180,
       key: t.key,
+      audioFile: t.file, // Include the audio file for playback
     }));
 
     onImportTracks(tracksToImport);

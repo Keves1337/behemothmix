@@ -1,12 +1,13 @@
 import { cn } from '@/lib/utils';
 import { Track } from '@/types/dj';
-import { Music2 } from 'lucide-react';
+import { Music2, Volume2, VolumeX } from 'lucide-react';
 
 interface TrackInfoProps {
   deck: 'a' | 'b';
   track: Track | null;
   bpm: number;
   position: number;
+  hasAudio?: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -15,7 +16,7 @@ const formatTime = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-const TrackInfo = ({ deck, track, bpm, position }: TrackInfoProps) => {
+const TrackInfo = ({ deck, track, bpm, position, hasAudio }: TrackInfoProps) => {
   const deckColor = deck === 'a' ? 'text-deck-a' : 'text-deck-b';
   const remaining = track ? track.duration - position : 0;
 
@@ -28,9 +29,16 @@ const TrackInfo = ({ deck, track, bpm, position }: TrackInfoProps) => {
         <>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h3 className={cn('font-semibold text-sm track-info', deckColor)}>
-                {track.title}
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className={cn('font-semibold text-sm track-info', deckColor)}>
+                  {track.title}
+                </h3>
+                {hasAudio ? (
+                  <span title="Audio ready"><Volume2 className="w-3 h-3 text-primary" /></span>
+                ) : (
+                  <span title="No audio - UI simulation only"><VolumeX className="w-3 h-3 text-muted-foreground/50" /></span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground track-info">
                 {track.artist}
               </p>
@@ -59,7 +67,7 @@ const TrackInfo = ({ deck, track, bpm, position }: TrackInfoProps) => {
           <Music2 className={cn('w-8 h-8', deckColor, 'opacity-30')} />
           <div>
             <p className="text-sm text-muted-foreground">No track loaded</p>
-            <p className="text-xs text-muted-foreground/60">Drag a track here</p>
+            <p className="text-xs text-muted-foreground/60">Drag a track here or import MP3 files</p>
           </div>
         </div>
       )}

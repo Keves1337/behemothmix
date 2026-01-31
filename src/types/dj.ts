@@ -6,6 +6,9 @@ export interface Track {
   duration: number;
   key: string;
   waveformData?: number[];
+  // Audio source for playback
+  audioUrl?: string;
+  audioFile?: File;
   // Energy map for auto-mix (0-100 energy level per 4 beats)
   energyMap?: number[];
   // Detected phrase/drop positions (in seconds)
