@@ -51,8 +51,9 @@ const EQKnobs = ({
   onFilterChange 
 }: EQKnobsProps) => {
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex gap-4">
+    <div className="flex items-center gap-4">
+      {/* Vertical stack of EQ knobs */}
+      <div className="flex flex-col gap-3">
         <Knob 
           label="HI" 
           value={high} 
@@ -72,20 +73,19 @@ const EQKnobs = ({
           color="eq-low"
         />
       </div>
-      <div className="flex justify-center">
-        <div className="flex flex-col items-center gap-1">
-          <span className={cn(
-            'eq-label',
-            deck === 'a' ? 'text-deck-a' : 'text-deck-b'
-          )}>FILTER</span>
-          <div 
-            className={cn(
-              'knob',
-              deck === 'a' ? 'border-t-2 border-deck-a' : 'border-t-2 border-deck-b'
-            )}
-            style={{ transform: `rotate(${(filter - 50) * 2.7}deg)` }}
-          />
-        </div>
+      {/* Filter knob */}
+      <div className="flex flex-col items-center gap-1 self-end">
+        <span className={cn(
+          'eq-label',
+          deck === 'a' ? 'text-deck-a' : 'text-deck-b'
+        )}>FILTER</span>
+        <div 
+          className={cn(
+            'knob',
+            deck === 'a' ? 'border-t-2 border-deck-a' : 'border-t-2 border-deck-b'
+          )}
+          style={{ transform: `rotate(${(filter - 50) * 2.7}deg)` }}
+        />
       </div>
     </div>
   );
