@@ -81,7 +81,7 @@ const TrackLibrary = ({ tracks, onLoadToDeck, onAddTracks }: TrackLibraryProps) 
           <div
             key={track.id}
             className={cn(
-              'library-item grid grid-cols-[1fr,auto,auto,auto] gap-2 items-center group',
+              'library-item grid grid-cols-[1fr,auto,auto,auto] gap-2 items-center group relative',
               selectedTrack === track.id && 'library-item-selected'
             )}
             onClick={() => setSelectedTrack(track.id)}
