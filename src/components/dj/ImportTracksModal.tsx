@@ -393,7 +393,15 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
                     onClick={() => {
                       const playlistId = spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)?.[1];
                       if (playlistId) {
-                        window.open(`spotify:playlist:${playlistId}`, '_blank');
+                        // Use anchor element for reliable URI scheme handling
+                        const link = document.createElement('a');
+                        link.href = `spotify:playlist:${playlistId}`;
+                        link.click();
+                        
+                        // Fallback to web player after short delay if app doesn't open
+                        setTimeout(() => {
+                          window.open(`https://open.spotify.com/playlist/${playlistId}`, '_blank');
+                        }, 1500);
                       }
                     }}
                   >
