@@ -22,6 +22,8 @@ const Index = () => {
     updateAutoMix,
     loadTrackToDeck,
     addTracks,
+    editTrack,
+    deleteTrack,
     setHotCue,
     deleteHotCue,
     setLoop,
@@ -185,6 +187,7 @@ const Index = () => {
             onSetLoop={(beats) => setLoop('a', beats)}
             onToggleLoop={() => toggleLoop('a')}
             onBeatJump={(dir) => beatJump('a', dir)}
+            onTrackDrop={(track) => loadTrackToDeck(track, 'a')}
           />
           <EffectsPanel deck="a" />
         </div>
@@ -212,6 +215,8 @@ const Index = () => {
               tracks={tracks}
               onLoadToDeck={loadTrackToDeck}
               onAddTracks={addTracks}
+              onEditTrack={editTrack}
+              onDeleteTrack={deleteTrack}
             />
           </div>
         </div>
@@ -227,6 +232,7 @@ const Index = () => {
             onSetLoop={(beats) => setLoop('b', beats)}
             onToggleLoop={() => toggleLoop('b')}
             onBeatJump={(dir) => beatJump('b', dir)}
+            onTrackDrop={(track) => loadTrackToDeck(track, 'b')}
           />
           <EffectsPanel deck="b" />
         </div>
