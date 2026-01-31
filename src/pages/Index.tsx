@@ -242,7 +242,7 @@ const Index = () => {
             }
           </span>
           <span className="text-center text-muted-foreground/70">
-            Developed, Designed & Tested by <span className="text-primary font-semibold">Johnatan Milrad</span>
+            Developed, Designed & Tested by <a href="https://keves1337.github.io/johnqablog/#about" target="_blank" rel="noopener noreferrer" className="text-primary font-semibold hover:underline transition-colors">Johnatan Milrad</a>
           </span>
           <span className="font-mono">
             {autoMix.enabled ? 'AUTO-MIX ACTIVE' : midi.isSupported ? 'Web MIDI Ready' : 'Serato/Rekordbox Style'}
