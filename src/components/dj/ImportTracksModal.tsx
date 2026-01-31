@@ -256,53 +256,18 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="w-4 h-4" />
-              Upload
+              Upload Files
             </TabsTrigger>
-            <TabsTrigger value="spotify" className="flex items-center gap-2">
-              <Disc className="w-4 h-4" />
-              Spotify
-            </TabsTrigger>
-            <TabsTrigger value="youtube" className="flex items-center gap-2">
-              <Youtube className="w-4 h-4" />
-              YouTube
+            <TabsTrigger value="import-url" className="flex items-center gap-2">
+              <ExternalLink className="w-4 h-4" />
+              Import URL
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="upload" className="flex-1 flex flex-col min-h-0 mt-4">
-            {/* Quick Spotify Sync */}
-            <div className="mb-4 p-3 bg-[hsl(142,70%,45%)]/10 border border-[hsl(142,70%,45%)]/30 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Disc className="w-4 h-4 text-[hsl(142,70%,45%)]" />
-                <span className="text-sm font-medium">Quick Spotify Sync</span>
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Paste Spotify playlist URL..."
-                  value={spotifyUrl}
-                  onChange={(e) => setSpotifyUrl(e.target.value)}
-                  className="flex-1 text-sm h-8"
-                />
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="gap-1.5 h-8 bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-black"
-                  disabled={!spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)}
-                  onClick={() => {
-                    const playlistId = spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)?.[1];
-                    if (playlistId) {
-                      window.open(`spotify:playlist:${playlistId}`, '_blank');
-                    }
-                  }}
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Open in Spotify
-                </Button>
-              </div>
-            </div>
-
             {/* Album Info */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
@@ -406,53 +371,26 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
             )}
           </TabsContent>
 
-          <TabsContent value="spotify" className="flex-1 flex flex-col min-h-0 mt-4">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="spotifyUrl" className="text-xs text-muted-foreground">Spotify Playlist URL</Label>
-                <div className="flex gap-2 mt-1">
+          <TabsContent value="import-url" className="flex-1 flex flex-col min-h-0 mt-4">
+            <div className="space-y-6">
+              {/* Spotify URL */}
+              <div className="p-4 bg-[hsl(142,70%,45%)]/10 border border-[hsl(142,70%,45%)]/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Disc className="w-4 h-4 text-[hsl(142,70%,45%)]" />
+                  <Label className="text-sm font-medium">Spotify Playlist</Label>
+                </div>
+                <div className="flex gap-2">
                   <Input
-                    id="spotifyUrl"
                     placeholder="https://open.spotify.com/playlist/..."
                     value={spotifyUrl}
                     onChange={(e) => setSpotifyUrl(e.target.value)}
                     className="flex-1"
                   />
-                  <Button 
-                    onClick={handleSpotifyImport}
-                    disabled={isLoading}
-                    variant="secondary"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Fetch'
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              {spotifyPlaylistInfo && (
-                <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
-                  {spotifyPlaylistInfo.thumbnail && (
-                    <img 
-                      src={spotifyPlaylistInfo.thumbnail} 
-                      alt="Playlist cover" 
-                      className="w-16 h-16 rounded-md object-cover"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <p className="font-medium">{spotifyPlaylistInfo.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Playlist found! Open it in your Spotify app.
-                    </p>
-                  </div>
                   <Button
                     variant="default"
-                    size="sm"
-                    className="shrink-0 gap-2"
+                    className="gap-2 bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-black"
+                    disabled={!spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)}
                     onClick={() => {
-                      // Convert web URL to Spotify URI for desktop app
                       const playlistId = spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)?.[1];
                       if (playlistId) {
                         window.open(`spotify:playlist:${playlistId}`, '_blank');
@@ -463,27 +401,16 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
                     Open in Spotify
                   </Button>
                 </div>
-              )}
-
-              <div className="bg-muted/30 rounded-lg p-4 text-sm">
-                <p className="font-medium mb-2">How it works:</p>
-                <ul className="text-muted-foreground space-y-1 text-xs">
-                  <li>• Paste a Spotify playlist share URL above</li>
-                  <li>• Click "Fetch" to load the playlist info</li>
-                  <li>• Click "Open in Spotify" to launch it in your desktop app</li>
-                  <li>• No Spotify API key required!</li>
-                </ul>
               </div>
-            </div>
-          </TabsContent>
 
-          <TabsContent value="youtube" className="flex-1 flex flex-col min-h-0 mt-4">
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="youtubeUrl" className="text-xs text-muted-foreground">YouTube Playlist URL</Label>
-                <div className="flex gap-2 mt-1">
+              {/* YouTube URL */}
+              <div className="p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Youtube className="w-4 h-4 text-destructive" />
+                  <Label className="text-sm font-medium">YouTube Playlist</Label>
+                </div>
+                <div className="flex gap-2">
                   <Input
-                    id="youtubeUrl"
                     placeholder="https://www.youtube.com/playlist?list=..."
                     value={youtubeUrl}
                     onChange={(e) => setYoutubeUrl(e.target.value)}
@@ -506,10 +433,9 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
               <div className="bg-muted/30 rounded-lg p-4 text-sm">
                 <p className="font-medium mb-2">How it works:</p>
                 <ul className="text-muted-foreground space-y-1 text-xs">
-                  <li>• Paste a YouTube playlist URL above</li>
-                  <li>• We'll extract track titles and metadata</li>
-                  <li>• Note: Audio files are not downloaded (metadata only)</li>
-                  <li>• You can then match with your local files</li>
+                  <li>• <strong>Spotify:</strong> Paste URL → Click "Open in Spotify" to launch desktop app</li>
+                  <li>• <strong>YouTube:</strong> Paste URL → Click "Fetch" to extract metadata</li>
+                  <li>• No API keys required!</li>
                 </ul>
               </div>
             </div>
