@@ -14,6 +14,7 @@ const Index = () => {
     deckB,
     mixer,
     autoMix,
+    autoMixState,
     tracks,
     updateDeckA,
     updateDeckB,
@@ -21,6 +22,11 @@ const Index = () => {
     updateAutoMix,
     loadTrackToDeck,
     addTracks,
+    setHotCue,
+    deleteHotCue,
+    setLoop,
+    toggleLoop,
+    beatJump,
   } = useDJController();
 
   // Deck A handlers
@@ -167,22 +173,28 @@ const Index = () => {
       />
 
       {/* Main Content */}
-      <div className="flex-1 p-4 flex gap-4 overflow-hidden">
+      <div className="flex-1 p-3 flex gap-3 overflow-hidden">
         {/* Left Side - Deck A */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
+        <div className="flex-1 flex flex-col gap-3 min-w-0">
           <Deck 
             deckId="a"
             state={deckA}
             onStateChange={updateDeckA}
+            onSetHotCue={(index) => setHotCue('a', index)}
+            onDeleteHotCue={(index) => deleteHotCue('a', index)}
+            onSetLoop={(beats) => setLoop('a', beats)}
+            onToggleLoop={() => toggleLoop('a')}
+            onBeatJump={(dir) => beatJump('a', dir)}
           />
           <EffectsPanel deck="a" />
         </div>
 
         {/* Center - Mixer & Library */}
-        <div className="w-80 flex flex-col gap-4">
+        <div className="w-80 flex flex-col gap-3">
           {/* Auto Mix */}
           <AutoMixPanel 
             settings={autoMix}
+            state={autoMixState}
             onSettingsChange={updateAutoMix}
           />
 
@@ -205,11 +217,16 @@ const Index = () => {
         </div>
 
         {/* Right Side - Deck B */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
+        <div className="flex-1 flex flex-col gap-3 min-w-0">
           <Deck 
             deckId="b"
             state={deckB}
             onStateChange={updateDeckB}
+            onSetHotCue={(index) => setHotCue('b', index)}
+            onDeleteHotCue={(index) => deleteHotCue('b', index)}
+            onSetLoop={(beats) => setLoop('b', beats)}
+            onToggleLoop={() => toggleLoop('b')}
+            onBeatJump={(dir) => beatJump('b', dir)}
           />
           <EffectsPanel deck="b" />
         </div>
@@ -221,11 +238,11 @@ const Index = () => {
           <span>
             {midi.isConnected 
               ? `✓ ${midi.activeDevice?.name || 'Controller'} connected - Hardware control active`
-              : 'Pioneer DDJ-SX1 Support • Connect via USB to enable hardware control'
+              : 'Pro Features: Hot Cues • Loops • Beat Jump • Smart Auto-Mix • Key Lock • Slip Mode'
             }
           </span>
           <span className="font-mono">
-            {midi.isSupported ? 'Web MIDI API Ready' : 'Web MIDI Not Supported'}
+            {autoMix.enabled ? 'AUTO-MIX ACTIVE' : midi.isSupported ? 'Web MIDI Ready' : 'Serato/Rekordbox Style'}
           </span>
         </div>
       </footer>

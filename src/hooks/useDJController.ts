@@ -1,5 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
-import { DeckState, MixerState, AutoMixSettings, Track } from '@/types/dj';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { DeckState, MixerState, AutoMixSettings, Track, AutoMixState, HotCue, LoopState } from '@/types/dj';
+
+const defaultLoop: LoopState = {
+  active: false,
+  inPoint: 0,
+  outPoint: 0,
+  length: 4,
+};
 
 const defaultDeckState: DeckState = {
   track: null,
@@ -12,6 +19,13 @@ const defaultDeckState: DeckState = {
   filter: 50,
   isSynced: false,
   cuePoint: 0,
+  hotCues: [],
+  loop: defaultLoop,
+  slipMode: false,
+  slipPosition: 0,
+  keyLock: false,
+  quantize: true,
+  beatJumpSize: 4,
 };
 
 const defaultMixerState: MixerState = {
@@ -25,48 +39,229 @@ const defaultAutoMixSettings: AutoMixSettings = {
   enabled: false,
   transitionTime: 16,
   transitionStyle: 'crossfade',
+  smartSync: true,
+  energyMatch: true,
+  harmonic: true,
 };
 
-// Sample tracks for demo
+const defaultAutoMixState: AutoMixState = {
+  isAnalyzing: false,
+  currentPhase: 'idle',
+  suggestedMixPoint: null,
+  transitionProgress: 0,
+  nextTrackReady: false,
+};
+
+// Generate simulated energy map for a track (energy levels per 8 beats)
+const generateEnergyMap = (duration: number, bpm: number): number[] => {
+  const beatsPerSecond = bpm / 60;
+  const segmentLength = 8 / beatsPerSecond; // 8 beats per segment
+  const segments = Math.ceil(duration / segmentLength);
+  const map: number[] = [];
+  
+  // Simulate typical EDM track structure: intro -> buildup -> drop -> breakdown -> drop -> outro
+  for (let i = 0; i < segments; i++) {
+    const progress = i / segments;
+    let energy: number;
+    
+    if (progress < 0.1) energy = 20 + Math.random() * 20; // Intro
+    else if (progress < 0.2) energy = 40 + progress * 200; // Buildup 1
+    else if (progress < 0.35) energy = 80 + Math.random() * 20; // Drop 1
+    else if (progress < 0.45) energy = 40 + Math.random() * 20; // Breakdown
+    else if (progress < 0.55) energy = 50 + (progress - 0.45) * 300; // Buildup 2
+    else if (progress < 0.75) energy = 85 + Math.random() * 15; // Drop 2 (main)
+    else if (progress < 0.9) energy = 60 - (progress - 0.75) * 200; // Outro buildup
+    else energy = 20 + Math.random() * 15; // Outro
+    
+    map.push(Math.min(100, Math.max(0, energy)));
+  }
+  return map;
+};
+
+// Find drop points in energy map
+const findDropPoints = (energyMap: number[], duration: number): number[] => {
+  const drops: number[] = [];
+  const segmentDuration = duration / energyMap.length;
+  
+  for (let i = 1; i < energyMap.length - 1; i++) {
+    // A drop is where energy suddenly jumps up significantly
+    if (energyMap[i] > energyMap[i - 1] + 25 && energyMap[i] > 70) {
+      drops.push(i * segmentDuration);
+    }
+  }
+  return drops;
+};
+
+// Sample tracks for demo with energy analysis
 const sampleTracks: Track[] = [
-  { id: '1', title: 'Midnight Pulse', artist: 'Neon Dreams', bpm: 128, duration: 245, key: '8A' },
-  { id: '2', title: 'Electric Horizon', artist: 'Synthwave Master', bpm: 124, duration: 312, key: '11B' },
-  { id: '3', title: 'Deep Space Nine', artist: 'Bass Commander', bpm: 130, duration: 278, key: '5A' },
-  { id: '4', title: 'Techno Revolution', artist: 'DJ Pulse', bpm: 132, duration: 289, key: '2A' },
-  { id: '5', title: 'Sunset Boulevard', artist: 'Chill Vibes', bpm: 118, duration: 234, key: '6B' },
-  { id: '6', title: 'Night Drive', artist: 'Retro Wave', bpm: 126, duration: 267, key: '9A' },
-  { id: '7', title: 'Digital Dreams', artist: 'Cyber Funk', bpm: 122, duration: 298, key: '4B' },
-  { id: '8', title: 'Underground Rhythm', artist: 'Deep House Collective', bpm: 124, duration: 321, key: '7A' },
-  { id: '9', title: 'Stellar Voyage', artist: 'Cosmic DJ', bpm: 128, duration: 276, key: '10B' },
-  { id: '10', title: 'Bass Drop City', artist: 'Heavy Beats', bpm: 140, duration: 198, key: '1A' },
-];
+  { id: '1', title: 'Midnight Pulse', artist: 'Neon Dreams', bpm: 128, duration: 245, key: '8A', introLength: 32, outroLength: 24 },
+  { id: '2', title: 'Electric Horizon', artist: 'Synthwave Master', bpm: 124, duration: 312, key: '11B', introLength: 24, outroLength: 32 },
+  { id: '3', title: 'Deep Space Nine', artist: 'Bass Commander', bpm: 130, duration: 278, key: '5A', introLength: 16, outroLength: 24 },
+  { id: '4', title: 'Techno Revolution', artist: 'DJ Pulse', bpm: 132, duration: 289, key: '2A', introLength: 32, outroLength: 32 },
+  { id: '5', title: 'Sunset Boulevard', artist: 'Chill Vibes', bpm: 118, duration: 234, key: '6B', introLength: 16, outroLength: 16 },
+  { id: '6', title: 'Night Drive', artist: 'Retro Wave', bpm: 126, duration: 267, key: '9A', introLength: 24, outroLength: 24 },
+  { id: '7', title: 'Digital Dreams', artist: 'Cyber Funk', bpm: 122, duration: 298, key: '4B', introLength: 32, outroLength: 24 },
+  { id: '8', title: 'Underground Rhythm', artist: 'Deep House Collective', bpm: 124, duration: 321, key: '7A', introLength: 24, outroLength: 32 },
+  { id: '9', title: 'Stellar Voyage', artist: 'Cosmic DJ', bpm: 128, duration: 276, key: '10B', introLength: 16, outroLength: 24 },
+  { id: '10', title: 'Bass Drop City', artist: 'Heavy Beats', bpm: 140, duration: 198, key: '1A', introLength: 8, outroLength: 16 },
+].map(track => ({
+  ...track,
+  energyMap: generateEnergyMap(track.duration, track.bpm),
+  dropPoints: [],
+})).map(track => ({
+  ...track,
+  dropPoints: findDropPoints(track.energyMap!, track.duration),
+}));
+
+// Camelot wheel for harmonic mixing
+const camelotWheel: { [key: string]: string[] } = {
+  '1A': ['1A', '12A', '2A', '1B'],
+  '2A': ['2A', '1A', '3A', '2B'],
+  '3A': ['3A', '2A', '4A', '3B'],
+  '4A': ['4A', '3A', '5A', '4B'],
+  '5A': ['5A', '4A', '6A', '5B'],
+  '6A': ['6A', '5A', '7A', '6B'],
+  '7A': ['7A', '6A', '8A', '7B'],
+  '8A': ['8A', '7A', '9A', '8B'],
+  '9A': ['9A', '8A', '10A', '9B'],
+  '10A': ['10A', '9A', '11A', '10B'],
+  '11A': ['11A', '10A', '12A', '11B'],
+  '12A': ['12A', '11A', '1A', '12B'],
+  '1B': ['1B', '12B', '2B', '1A'],
+  '2B': ['2B', '1B', '3B', '2A'],
+  '3B': ['3B', '2B', '4B', '3A'],
+  '4B': ['4B', '3B', '5B', '4A'],
+  '5B': ['5B', '4B', '6B', '5A'],
+  '6B': ['6B', '5B', '7B', '6A'],
+  '7B': ['7B', '6B', '8B', '7A'],
+  '8B': ['8B', '7B', '9B', '8A'],
+  '9B': ['9B', '8B', '10B', '9A'],
+  '10B': ['10B', '9B', '11B', '10A'],
+  '11B': ['11B', '10B', '12B', '11A'],
+  '12B': ['12B', '11B', '1B', '12A'],
+};
+
+export const isHarmonicMatch = (key1: string, key2: string): boolean => {
+  return camelotWheel[key1]?.includes(key2) || false;
+};
 
 export const useDJController = () => {
   const [deckA, setDeckA] = useState<DeckState>(defaultDeckState);
   const [deckB, setDeckB] = useState<DeckState>(defaultDeckState);
   const [mixer, setMixer] = useState<MixerState>(defaultMixerState);
   const [autoMix, setAutoMix] = useState<AutoMixSettings>(defaultAutoMixSettings);
+  const [autoMixState, setAutoMixState] = useState<AutoMixState>(defaultAutoMixState);
   const [tracks, setTracks] = useState<Track[]>(sampleTracks);
+  
+  const transitionRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Simulate playback progress
+  // Simulate playback progress with loop support
   useEffect(() => {
     const interval = setInterval(() => {
       if (deckA.isPlaying && deckA.track) {
-        setDeckA(prev => ({
-          ...prev,
-          position: prev.position >= prev.track!.duration ? 0 : prev.position + 0.1,
-        }));
+        setDeckA(prev => {
+          let newPosition = prev.position + 0.1;
+          
+          // Handle loop
+          if (prev.loop.active && newPosition >= prev.loop.outPoint) {
+            newPosition = prev.loop.inPoint;
+          }
+          
+          // Handle track end
+          if (newPosition >= prev.track!.duration) {
+            newPosition = 0;
+          }
+          
+          // Update slip position if slip mode is on
+          const newSlipPosition = prev.slipMode ? prev.slipPosition + 0.1 : prev.position;
+          
+          return { ...prev, position: newPosition, slipPosition: newSlipPosition };
+        });
       }
       if (deckB.isPlaying && deckB.track) {
-        setDeckB(prev => ({
-          ...prev,
-          position: prev.position >= prev.track!.duration ? 0 : prev.position + 0.1,
-        }));
+        setDeckB(prev => {
+          let newPosition = prev.position + 0.1;
+          
+          if (prev.loop.active && newPosition >= prev.loop.outPoint) {
+            newPosition = prev.loop.inPoint;
+          }
+          
+          if (newPosition >= prev.track!.duration) {
+            newPosition = 0;
+          }
+          
+          const newSlipPosition = prev.slipMode ? prev.slipPosition + 0.1 : prev.position;
+          
+          return { ...prev, position: newPosition, slipPosition: newSlipPosition };
+        });
       }
     }, 100);
 
     return () => clearInterval(interval);
   }, [deckA.isPlaying, deckB.isPlaying]);
+
+  // Smart Auto-Mix Logic
+  useEffect(() => {
+    if (!autoMix.enabled) {
+      if (transitionRef.current) {
+        clearInterval(transitionRef.current);
+        transitionRef.current = null;
+      }
+      setAutoMixState(prev => ({ ...prev, currentPhase: 'idle', transitionProgress: 0 }));
+      return;
+    }
+
+    const checkAutoMix = () => {
+      const playingDeck = deckA.isPlaying ? deckA : deckB.isPlaying ? deckB : null;
+      const otherDeck = deckA.isPlaying ? deckB : deckA;
+      const setPlayingDeck = deckA.isPlaying ? setDeckA : setDeckB;
+      const setOtherDeck = deckA.isPlaying ? setDeckB : setDeckA;
+
+      if (!playingDeck?.track || !otherDeck?.track) return;
+
+      const timeRemaining = playingDeck.track.duration - playingDeck.position;
+      const outroStart = playingDeck.track.outroLength || 16;
+
+      // Start transition when entering outro
+      if (timeRemaining <= outroStart && autoMixState.currentPhase === 'idle') {
+        setAutoMixState(prev => ({ 
+          ...prev, 
+          currentPhase: 'transitioning',
+          isAnalyzing: false,
+        }));
+
+        // Start the other deck
+        setOtherDeck(prev => ({ ...prev, isPlaying: true, position: 0 }));
+
+        // Begin crossfade
+        const transitionSteps = autoMix.transitionTime * 10; // 10 steps per second
+        let step = 0;
+        const startCrossfader = mixer.crossfader;
+        const targetCrossfader = deckA.isPlaying ? 100 : 0;
+
+        transitionRef.current = setInterval(() => {
+          step++;
+          const progress = step / transitionSteps;
+          const newCrossfader = startCrossfader + (targetCrossfader - startCrossfader) * progress;
+          
+          setMixer(prev => ({ ...prev, crossfader: newCrossfader }));
+          setAutoMixState(prev => ({ ...prev, transitionProgress: progress * 100 }));
+
+          if (step >= transitionSteps) {
+            if (transitionRef.current) clearInterval(transitionRef.current);
+            transitionRef.current = null;
+            
+            // Stop the old deck
+            setPlayingDeck(prev => ({ ...prev, isPlaying: false }));
+            setAutoMixState(prev => ({ ...prev, currentPhase: 'idle', transitionProgress: 0 }));
+          }
+        }, 100);
+      }
+    };
+
+    const autoMixInterval = setInterval(checkAutoMix, 500);
+    return () => clearInterval(autoMixInterval);
+  }, [autoMix.enabled, deckA.isPlaying, deckB.isPlaying, deckA.position, deckB.position, deckA.track, deckB.track, autoMixState.currentPhase, mixer.crossfader, autoMix.transitionTime]);
 
   const updateDeckA = useCallback((updates: Partial<DeckState>) => {
     setDeckA(prev => ({ ...prev, ...updates }));
@@ -85,11 +280,22 @@ export const useDJController = () => {
   }, []);
 
   const loadTrackToDeck = useCallback((track: Track, deck: 'a' | 'b') => {
-    const updates = {
-      track,
+    // Analyze track if not already analyzed
+    const analyzedTrack = {
+      ...track,
+      energyMap: track.energyMap || generateEnergyMap(track.duration, track.bpm),
+    };
+    if (!analyzedTrack.dropPoints) {
+      analyzedTrack.dropPoints = findDropPoints(analyzedTrack.energyMap, track.duration);
+    }
+
+    const updates: Partial<DeckState> = {
+      track: analyzedTrack,
       bpm: track.bpm,
       position: 0,
       cuePoint: 0,
+      loop: defaultLoop,
+      hotCues: [],
     };
 
     if (deck === 'a') {
@@ -100,14 +306,99 @@ export const useDJController = () => {
   }, [updateDeckA, updateDeckB]);
 
   const addTracks = useCallback((newTracks: Track[]) => {
-    setTracks(prev => [...prev, ...newTracks]);
+    const analyzedTracks = newTracks.map(track => ({
+      ...track,
+      energyMap: generateEnergyMap(track.duration, track.bpm),
+      dropPoints: [],
+    })).map(track => ({
+      ...track,
+      dropPoints: findDropPoints(track.energyMap!, track.duration),
+    }));
+    setTracks(prev => [...prev, ...analyzedTracks]);
   }, []);
+
+  // Hot cue management
+  const setHotCue = useCallback((deck: 'a' | 'b', cueIndex: number) => {
+    const deckState = deck === 'a' ? deckA : deckB;
+    const setDeck = deck === 'a' ? setDeckA : setDeckB;
+    
+    const existingCue = deckState.hotCues.find(c => c.id === cueIndex);
+    if (existingCue) {
+      // Jump to existing cue
+      setDeck(prev => ({ ...prev, position: existingCue.position }));
+    } else {
+      // Create new cue
+      const colors = ['#FF5722', '#4CAF50', '#2196F3', '#9C27B0', '#FFC107', '#00BCD4', '#E91E63', '#8BC34A'];
+      const newCue: HotCue = {
+        id: cueIndex,
+        position: deckState.position,
+        label: `CUE ${cueIndex + 1}`,
+        color: colors[cueIndex % colors.length],
+        type: 'cue',
+      };
+      setDeck(prev => ({ ...prev, hotCues: [...prev.hotCues, newCue] }));
+    }
+  }, [deckA, deckB]);
+
+  const deleteHotCue = useCallback((deck: 'a' | 'b', cueIndex: number) => {
+    const setDeck = deck === 'a' ? setDeckA : setDeckB;
+    setDeck(prev => ({ 
+      ...prev, 
+      hotCues: prev.hotCues.filter(c => c.id !== cueIndex) 
+    }));
+  }, []);
+
+  // Loop control
+  const setLoop = useCallback((deck: 'a' | 'b', beats: number) => {
+    const deckState = deck === 'a' ? deckA : deckB;
+    const setDeck = deck === 'a' ? setDeckA : setDeckB;
+    
+    if (!deckState.track) return;
+    
+    const beatsPerSecond = deckState.bpm / 60;
+    const loopLength = beats / beatsPerSecond;
+    
+    setDeck(prev => ({
+      ...prev,
+      loop: {
+        active: true,
+        inPoint: prev.position,
+        outPoint: prev.position + loopLength,
+        length: beats,
+      },
+    }));
+  }, [deckA, deckB]);
+
+  const toggleLoop = useCallback((deck: 'a' | 'b') => {
+    const setDeck = deck === 'a' ? setDeckA : setDeckB;
+    setDeck(prev => ({
+      ...prev,
+      loop: { ...prev.loop, active: !prev.loop.active },
+    }));
+  }, []);
+
+  // Beat jump
+  const beatJump = useCallback((deck: 'a' | 'b', direction: 1 | -1) => {
+    const deckState = deck === 'a' ? deckA : deckB;
+    const setDeck = deck === 'a' ? setDeckA : setDeckB;
+    
+    if (!deckState.track) return;
+    
+    const beatsPerSecond = deckState.bpm / 60;
+    const jumpSeconds = deckState.beatJumpSize / beatsPerSecond * direction;
+    
+    setDeck(prev => ({
+      ...prev,
+      position: Math.max(0, Math.min(prev.track!.duration, prev.position + jumpSeconds)),
+    }));
+  }, [deckA, deckB]);
 
   return {
     deckA,
     deckB,
     mixer,
     autoMix,
+    autoMixState,
     tracks,
     updateDeckA,
     updateDeckB,
@@ -115,5 +406,11 @@ export const useDJController = () => {
     updateAutoMix,
     loadTrackToDeck,
     addTracks,
+    setHotCue,
+    deleteHotCue,
+    setLoop,
+    toggleLoop,
+    beatJump,
+    isHarmonicMatch,
   };
 };

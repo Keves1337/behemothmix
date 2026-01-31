@@ -1,19 +1,37 @@
-import { DeckState } from '@/types/dj';
+import { DeckState, HotCue, LoopState } from '@/types/dj';
 import Waveform from './Waveform';
 import JogWheel from './JogWheel';
 import TransportControls from './TransportControls';
 import EQKnobs from './EQKnobs';
 import VolumeFader from './VolumeFader';
 import TrackInfo from './TrackInfo';
+import HotCuePads from './HotCuePads';
+import LoopControls from './LoopControls';
+import BeatJumpControls from './BeatJumpControls';
+import DeckModeControls from './DeckModeControls';
 import { cn } from '@/lib/utils';
 
 interface DeckProps {
   deckId: 'a' | 'b';
   state: DeckState;
   onStateChange: (newState: Partial<DeckState>) => void;
+  onSetHotCue?: (index: number) => void;
+  onDeleteHotCue?: (index: number) => void;
+  onSetLoop?: (beats: number) => void;
+  onToggleLoop?: () => void;
+  onBeatJump?: (direction: 1 | -1) => void;
 }
 
-const Deck = ({ deckId, state, onStateChange }: DeckProps) => {
+const Deck = ({ 
+  deckId, 
+  state, 
+  onStateChange,
+  onSetHotCue,
+  onDeleteHotCue,
+  onSetLoop,
+  onToggleLoop,
+  onBeatJump,
+}: DeckProps) => {
   const handlePlay = () => {
     onStateChange({ isPlaying: !state.isPlaying });
   };
@@ -42,16 +60,27 @@ const Deck = ({ deckId, state, onStateChange }: DeckProps) => {
 
   return (
     <div className={cn(
-      'deck-panel flex flex-col gap-4',
+      'deck-panel flex flex-col gap-3',
       deckId === 'a' ? 'deck-a-panel' : 'deck-b-panel'
     )}>
-      {/* Deck Label */}
+      {/* Deck Label & Mode Controls */}
       <div className="flex items-center justify-between">
-        <div className={cn(
-          'font-display text-2xl font-bold',
-          deckId === 'a' ? 'text-deck-a' : 'text-deck-b'
-        )}>
-          DECK {deckId.toUpperCase()}
+        <div className="flex items-center gap-3">
+          <div className={cn(
+            'font-display text-2xl font-bold',
+            deckId === 'a' ? 'text-deck-a' : 'text-deck-b'
+          )}>
+            DECK {deckId.toUpperCase()}
+          </div>
+          <DeckModeControls
+            deck={deckId}
+            keyLock={state.keyLock}
+            quantize={state.quantize}
+            slipMode={state.slipMode}
+            onKeyLockToggle={() => onStateChange({ keyLock: !state.keyLock })}
+            onQuantizeToggle={() => onStateChange({ quantize: !state.quantize })}
+            onSlipModeToggle={() => onStateChange({ slipMode: !state.slipMode })}
+          />
         </div>
         {/* Pitch/Tempo */}
         <div className="text-right">
@@ -81,18 +110,44 @@ const Deck = ({ deckId, state, onStateChange }: DeckProps) => {
         isPlaying={state.isPlaying}
         position={state.position}
         duration={state.track?.duration || 300}
+        hotCues={state.hotCues}
+        loop={state.loop}
       />
 
+      {/* Performance Pads Section */}
+      <div className="grid grid-cols-2 gap-3">
+        <HotCuePads
+          deck={deckId}
+          hotCues={state.hotCues}
+          onSetCue={onSetHotCue || (() => {})}
+          onDeleteCue={onDeleteHotCue || (() => {})}
+        />
+        <div className="space-y-3">
+          <LoopControls
+            deck={deckId}
+            loop={state.loop}
+            onSetLoop={onSetLoop || (() => {})}
+            onToggleLoop={onToggleLoop || (() => {})}
+          />
+          <BeatJumpControls
+            deck={deckId}
+            beatJumpSize={state.beatJumpSize}
+            onBeatJump={onBeatJump || (() => {})}
+            onSizeChange={(size) => onStateChange({ beatJumpSize: size })}
+          />
+        </div>
+      </div>
+
       {/* Controls Section */}
-      <div className="flex items-start gap-6">
+      <div className="flex items-start gap-4">
         {/* Jog Wheel */}
         <JogWheel 
           deck={deckId}
           isPlaying={state.isPlaying}
-          rotation={state.position * 6} // 6 degrees per second
+          rotation={state.position * 6}
         />
 
-        <div className="flex flex-col gap-4 flex-1">
+        <div className="flex flex-col gap-3 flex-1">
           {/* Transport Controls */}
           <TransportControls
             deck={deckId}
@@ -104,7 +159,7 @@ const Deck = ({ deckId, state, onStateChange }: DeckProps) => {
           />
 
           {/* EQ and Volume Section */}
-          <div className="flex items-stretch gap-6">
+          <div className="flex items-stretch gap-4">
             <EQKnobs
               deck={deckId}
               high={state.eq.high}
