@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Zap, Clock, Shuffle, Brain, Music2, Waves, Activity, ListMusic } from 'lucide-react';
+import { Zap, Clock, Shuffle, Brain, Music2, Waves, Activity, ListMusic, Sparkles } from 'lucide-react';
 import { AutoMixSettings, AutoMixState, Track } from '@/types/dj';
 
 interface AutoMixPanelProps {
@@ -11,12 +11,21 @@ interface AutoMixPanelProps {
 
 const AutoMixPanel = ({ settings, state, onSettingsChange, tracks }: AutoMixPanelProps) => {
   const queuedTrack = tracks?.find(t => t.id === state?.queuedTrackId);
+
   const transitionStyles: { id: AutoMixSettings['transitionStyle']; label: string; icon: React.ReactNode }[] = [
+    { id: 'auto', label: 'Auto', icon: <Sparkles className="w-3 h-3" /> },
     { id: 'crossfade', label: 'Fade', icon: <Waves className="w-3 h-3" /> },
     { id: 'beatmatch', label: 'Beat', icon: <Activity className="w-3 h-3" /> },
     { id: 'drop', label: 'Drop', icon: <Zap className="w-3 h-3" /> },
     { id: 'cut', label: 'Cut', icon: <Music2 className="w-3 h-3" /> },
   ];
+
+  const styleLabels: Record<string, string> = {
+    crossfade: 'Crossfade',
+    beatmatch: 'Beatmatch',
+    drop: 'Drop Mix',
+    cut: 'Hard Cut',
+  };
 
   return (
     <div className="p-4 rounded-lg bg-card/50 border border-border">
@@ -66,7 +75,14 @@ const AutoMixPanel = ({ settings, state, onSettingsChange, tracks }: AutoMixPane
               <ListMusic className="w-3 h-3 text-primary flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="font-medium truncate text-foreground">{queuedTrack.title}</p>
-                <p className="text-muted-foreground truncate">{queuedTrack.artist} • {queuedTrack.bpm} BPM</p>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <span className="truncate">{queuedTrack.artist} • {queuedTrack.bpm} BPM</span>
+                  {state.selectedStyle && settings.transitionStyle === 'auto' && (
+                    <span className="text-primary font-medium">
+                      → {styleLabels[state.selectedStyle]}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )}

@@ -66,7 +66,7 @@ export interface MixerState {
 export interface AutoMixSettings {
   enabled: boolean;
   transitionTime: number;
-  transitionStyle: 'crossfade' | 'cut' | 'beatmatch' | 'drop';
+  transitionStyle: 'auto' | 'crossfade' | 'cut' | 'beatmatch' | 'drop';
   smartSync: boolean; // analyze tracks for optimal mix point
   energyMatch: boolean; // match energy levels
   harmonic: boolean; // prefer harmonically compatible tracks
@@ -79,6 +79,7 @@ export interface AutoMixState {
   transitionProgress: number;
   nextTrackReady: boolean;
   queuedTrackId: string | null;
+  selectedStyle: 'crossfade' | 'cut' | 'beatmatch' | 'drop' | null;
 }
 
 export interface EffectState {

@@ -38,7 +38,7 @@ const defaultMixerState: MixerState = {
 const defaultAutoMixSettings: AutoMixSettings = {
   enabled: false,
   transitionTime: 16,
-  transitionStyle: 'crossfade',
+  transitionStyle: 'auto',
   smartSync: true,
   energyMatch: true,
   harmonic: true,
@@ -51,6 +51,7 @@ const defaultAutoMixState: AutoMixState = {
   transitionProgress: 0,
   nextTrackReady: false,
   queuedTrackId: null,
+  selectedStyle: null,
 };
 
 // Generate simulated energy map for a track (energy levels per 8 beats)
@@ -144,6 +145,46 @@ const camelotWheel: { [key: string]: string[] } = {
 
 export const isHarmonicMatch = (key1: string, key2: string): boolean => {
   return camelotWheel[key1]?.includes(key2) || false;
+};
+
+// Determine optimal transition style based on track characteristics
+export const determineTransitionStyle = (
+  currentTrack: Track,
+  nextTrack: Track,
+  currentPosition: number
+): 'crossfade' | 'cut' | 'beatmatch' | 'drop' => {
+  const bpmDiff = Math.abs(currentTrack.bpm - nextTrack.bpm);
+  const bpmRatio = bpmDiff / currentTrack.bpm;
+  
+  // Get energy levels
+  const currentOutroEnergy = currentTrack.energyMap 
+    ? currentTrack.energyMap[currentTrack.energyMap.length - 1] || 50 
+    : 50;
+  const nextIntroEnergy = nextTrack.energyMap 
+    ? nextTrack.energyMap[0] || 50 
+    : 50;
+  
+  // Check if next track has a nearby drop point
+  const hasEarlyDrop = nextTrack.dropPoints && nextTrack.dropPoints.length > 0 
+    && nextTrack.dropPoints[0] < 60; // Drop within first 60 seconds
+  
+  // High energy tracks with drops - use drop mixing
+  if (hasEarlyDrop && nextIntroEnergy > 60 && currentOutroEnergy > 50) {
+    return 'drop';
+  }
+  
+  // Very close BPM (within 2%) - beatmatch is ideal
+  if (bpmRatio <= 0.02) {
+    return 'beatmatch';
+  }
+  
+  // Large BPM difference (>8%) or big energy change - use cut
+  if (bpmRatio > 0.08 || Math.abs(currentOutroEnergy - nextIntroEnergy) > 40) {
+    return 'cut';
+  }
+  
+  // Default to crossfade for smooth transitions
+  return 'crossfade';
 };
 
 export const useDJController = () => {
@@ -297,13 +338,20 @@ export const useDJController = () => {
     const nextTrack = selectNextTrack(currentTrack, excludeIds);
     if (nextTrack) {
       loadTrackToDeck(nextTrack, targetDeck);
+      
+      // Determine optimal transition style if set to auto
+      const selectedStyle = autoMix.transitionStyle === 'auto'
+        ? determineTransitionStyle(currentTrack, nextTrack, 0)
+        : autoMix.transitionStyle;
+      
       setAutoMixState(prev => ({ 
         ...prev, 
         nextTrackReady: true,
         queuedTrackId: nextTrack.id,
+        selectedStyle,
       }));
     }
-  }, [selectNextTrack, deckA.track, deckB.track, loadTrackToDeck]);
+  }, [selectNextTrack, deckA.track, deckB.track, loadTrackToDeck, autoMix.transitionStyle]);
 
   // Smart Auto-Mix Logic with auto-queue
   useEffect(() => {
