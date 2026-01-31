@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { useDJController } from './useDJController';
 import { useAudioEngine } from './useAudioEngine';
 import { Track } from '@/types/dj';
@@ -9,11 +9,24 @@ export const useDJWithAudio = () => {
   const audio = useAudioEngine();
   const animationFrameRef = useRef<number | null>(null);
   const lastPositionUpdateRef = useRef<{ a: number; b: number }>({ a: 0, b: 0 });
+  
+  // Waveform data state
+  const [deckAWaveform, setDeckAWaveform] = useState<number[] | null>(null);
+  const [deckBWaveform, setDeckBWaveform] = useState<number[] | null>(null);
+  const [deckARealtimeData, setDeckARealtimeData] = useState<Float32Array | null>(null);
+  const [deckBRealtimeData, setDeckBRealtimeData] = useState<Float32Array | null>(null);
 
-  // Load track with audio
+  // Load track with audio and analyze waveform
   const loadTrackToDeck = useCallback(async (track: Track, deck: 'a' | 'b') => {
     // First load into controller
     controller.loadTrackToDeck(track, deck);
+    
+    // Clear previous waveform
+    if (deck === 'a') {
+      setDeckAWaveform(null);
+    } else {
+      setDeckBWaveform(null);
+    }
     
     // Then load audio if available
     if (track.audioFile || track.audioUrl) {
@@ -23,6 +36,20 @@ export const useDJWithAudio = () => {
           title: "Track loaded",
           description: `${track.title} loaded to Deck ${deck.toUpperCase()} with audio`,
         });
+        
+        // Analyze waveform in background
+        const waveform = await audio.analyzeFullTrack(track);
+        if (waveform) {
+          if (deck === 'a') {
+            setDeckAWaveform(waveform);
+          } else {
+            setDeckBWaveform(waveform);
+          }
+          toast({
+            title: "Waveform analyzed",
+            description: `Waveform generated for ${track.title}`,
+          });
+        }
       }
     }
   }, [controller, audio]);
@@ -52,7 +79,7 @@ export const useDJWithAudio = () => {
     syncAudio();
   }, [controller.deckA.isPlaying, controller.deckB.isPlaying, audio]);
 
-  // Sync position from audio to controller
+  // Sync position from audio to controller AND update real-time waveform data
   useEffect(() => {
     const updatePositions = () => {
       // Only update position from audio if playing and audio is loaded
@@ -62,6 +89,11 @@ export const useDJWithAudio = () => {
           lastPositionUpdateRef.current.a = pos;
           controller.updateDeckA({ position: pos });
         }
+        // Get real-time waveform data
+        const realtimeData = audio.getRealtimeWaveform('a');
+        if (realtimeData) {
+          setDeckARealtimeData(new Float32Array(realtimeData));
+        }
       }
 
       if (controller.deckB.isPlaying && audio.deckBHasAudio) {
@@ -69,6 +101,11 @@ export const useDJWithAudio = () => {
         if (Math.abs(pos - lastPositionUpdateRef.current.b) > 0.05) {
           lastPositionUpdateRef.current.b = pos;
           controller.updateDeckB({ position: pos });
+        }
+        // Get real-time waveform data
+        const realtimeData = audio.getRealtimeWaveform('b');
+        if (realtimeData) {
+          setDeckBRealtimeData(new Float32Array(realtimeData));
         }
       }
 
@@ -159,5 +196,10 @@ export const useDJWithAudio = () => {
     updateDeckB,
     deckAHasAudio: audio.deckAHasAudio,
     deckBHasAudio: audio.deckBHasAudio,
+    deckAWaveform,
+    deckBWaveform,
+    deckARealtimeData,
+    deckBRealtimeData,
+    getFrequencyData: audio.getFrequencyData,
   };
 };
