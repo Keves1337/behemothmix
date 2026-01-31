@@ -8,12 +8,22 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// GitHub Pages uses a sub-path (e.g. /behemothmix/). The Lovable preview runs at /.
+// If we always set basename=BASE_URL, the preview URL won't match and React Router renders nothing.
+const getRouterBasename = () => {
+  const base = import.meta.env.BASE_URL;
+  if (!base || base === "/") return "/";
+
+  // Only use the base when the current URL actually starts with it.
+  return window.location.pathname.startsWith(base) ? base : "/";
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <BrowserRouter basename={getRouterBasename()}>
         <Routes>
           <Route path="/" element={<Index />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
