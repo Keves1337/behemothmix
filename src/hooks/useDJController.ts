@@ -46,7 +46,7 @@ export const useDJController = () => {
   const [deckB, setDeckB] = useState<DeckState>(defaultDeckState);
   const [mixer, setMixer] = useState<MixerState>(defaultMixerState);
   const [autoMix, setAutoMix] = useState<AutoMixSettings>(defaultAutoMixSettings);
-  const [tracks] = useState<Track[]>(sampleTracks);
+  const [tracks, setTracks] = useState<Track[]>(sampleTracks);
 
   // Simulate playback progress
   useEffect(() => {
@@ -99,6 +99,10 @@ export const useDJController = () => {
     }
   }, [updateDeckA, updateDeckB]);
 
+  const addTracks = useCallback((newTracks: Track[]) => {
+    setTracks(prev => [...prev, ...newTracks]);
+  }, []);
+
   return {
     deckA,
     deckB,
@@ -110,5 +114,6 @@ export const useDJController = () => {
     updateMixer,
     updateAutoMix,
     loadTrackToDeck,
+    addTracks,
   };
 };

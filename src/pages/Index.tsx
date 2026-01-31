@@ -20,6 +20,7 @@ const Index = () => {
     updateMixer,
     updateAutoMix,
     loadTrackToDeck,
+    addTracks,
   } = useDJController();
 
   // MIDI action handlers
@@ -169,6 +170,7 @@ const Index = () => {
             <TrackLibrary 
               tracks={tracks}
               onLoadToDeck={loadTrackToDeck}
+              onAddTracks={addTracks}
             />
           </div>
         </div>
