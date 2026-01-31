@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Youtube, Music, Loader2, X, FolderOpen } from 'lucide-react';
+import { Upload, Youtube, Music, Loader2, X, FolderOpen, Disc } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface ImportTracksModalProps {
@@ -28,9 +28,11 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
   const [activeTab, setActiveTab] = useState('upload');
   const [pendingTracks, setPendingTracks] = useState<PendingTrack[]>([]);
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [spotifyUrl, setSpotifyUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [albumName, setAlbumName] = useState('');
   const [artistName, setArtistName] = useState('');
+  const [spotifyPlaylistInfo, setSpotifyPlaylistInfo] = useState<{title: string; thumbnail: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,6 +133,61 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
     }
   };
 
+  const handleSpotifyImport = async () => {
+    if (!spotifyUrl.trim()) {
+      toast({
+        title: "Enter URL",
+        description: "Please enter a Spotify playlist URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Extract playlist ID from various Spotify URL formats
+    const playlistMatch = spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/);
+    if (!playlistMatch) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid Spotify playlist URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    
+    try {
+      // Use Spotify's oEmbed API (no auth required)
+      const oEmbedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(spotifyUrl)}`;
+      const response = await fetch(oEmbedUrl);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch playlist info');
+      }
+      
+      const data = await response.json();
+      
+      setSpotifyPlaylistInfo({
+        title: data.title || 'Unknown Playlist',
+        thumbnail: data.thumbnail_url || '',
+      });
+      
+      toast({
+        title: "Playlist found!",
+        description: `"${data.title}" - You can now add tracks manually based on this playlist`,
+      });
+    } catch (error) {
+      toast({
+        title: "Import failed",
+        description: "Could not fetch playlist data. Check the URL and try again.",
+        variant: "destructive",
+      });
+      setSpotifyPlaylistInfo(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const removePendingTrack = (id: string) => {
     setPendingTracks(prev => prev.filter(t => t.id !== id));
   };
@@ -171,6 +228,8 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
     // Reset state
     setPendingTracks([]);
     setYoutubeUrl('');
+    setSpotifyUrl('');
+    setSpotifyPlaylistInfo(null);
     setAlbumName('');
     setArtistName('');
     onOpenChange(false);
@@ -197,14 +256,18 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="upload" className="flex items-center gap-2">
               <Upload className="w-4 h-4" />
-              Upload Files
+              Upload
+            </TabsTrigger>
+            <TabsTrigger value="spotify" className="flex items-center gap-2">
+              <Disc className="w-4 h-4" />
+              Spotify
             </TabsTrigger>
             <TabsTrigger value="youtube" className="flex items-center gap-2">
               <Youtube className="w-4 h-4" />
-              YouTube Playlist
+              YouTube
             </TabsTrigger>
           </TabsList>
 
@@ -310,6 +373,62 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
                 </div>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="spotify" className="flex-1 flex flex-col min-h-0 mt-4">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="spotifyUrl" className="text-xs text-muted-foreground">Spotify Playlist URL</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    id="spotifyUrl"
+                    placeholder="https://open.spotify.com/playlist/..."
+                    value={spotifyUrl}
+                    onChange={(e) => setSpotifyUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button 
+                    onClick={handleSpotifyImport}
+                    disabled={isLoading}
+                    variant="secondary"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Fetch'
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {spotifyPlaylistInfo && (
+                <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
+                  {spotifyPlaylistInfo.thumbnail && (
+                    <img 
+                      src={spotifyPlaylistInfo.thumbnail} 
+                      alt="Playlist cover" 
+                      className="w-16 h-16 rounded-md object-cover"
+                    />
+                  )}
+                  <div>
+                    <p className="font-medium">{spotifyPlaylistInfo.title}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Playlist found! Add tracks manually based on this reference.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-muted/30 rounded-lg p-4 text-sm">
+                <p className="font-medium mb-2">How it works:</p>
+                <ul className="text-muted-foreground space-y-1 text-xs">
+                  <li>• Paste a Spotify playlist share URL above</li>
+                  <li>• We'll fetch the playlist title and cover art</li>
+                  <li>• Use this as a reference to add your local MP3 files</li>
+                  <li>• No Spotify API key required!</li>
+                </ul>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="youtube" className="flex-1 flex flex-col min-h-0 mt-4">
