@@ -1,9 +1,15 @@
-import { useState } from 'react';
-import { Settings, Volume2, Headphones, Maximize2, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, Volume2, Headphones, Maximize2, Activity, Download } from 'lucide-react';
 import ControllerStatus from './ControllerStatus';
 import MIDIMonitor from './MIDIMonitor';
 import { MIDIDevice, MIDIMessage } from '@/hooks/useWebMIDI';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 interface HeaderProps {
   masterVolume: number;
@@ -30,6 +36,48 @@ const Header = ({
   onMidiSelectDevice,
 }: HeaderProps) => {
   const [showMidiMonitor, setShowMidiMonitor] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+
+    // Capture the install prompt event
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setInstallPrompt(e as BeforeInstallPromptEvent);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (installPrompt) {
+      await installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setIsInstalled(true);
+        toast({
+          title: "App installed!",
+          description: "MixMaster DJ has been added to your desktop",
+        });
+      }
+      setInstallPrompt(null);
+    } else if (!isInstalled) {
+      // Fallback for browsers that don't support beforeinstallprompt
+      toast({
+        title: "Install MixMaster DJ",
+        description: "Click the install icon (⊕) in your browser's address bar, or use Menu → Install app",
+      });
+    }
+  };
 
   return (
     <>
@@ -101,6 +149,22 @@ const Header = ({
           >
             <Activity className="w-5 h-5" />
           </button>
+
+          {/* Install App Button */}
+          {!isInstalled && (
+            <button 
+              onClick={handleInstallClick}
+              className={cn(
+                'p-2 rounded-lg transition-colors',
+                installPrompt 
+                  ? 'bg-primary/20 text-primary animate-pulse' 
+                  : 'bg-muted/50 hover:bg-muted text-muted-foreground'
+              )}
+              title="Install App"
+            >
+              <Download className="w-5 h-5" />
+            </button>
+          )}
 
           {/* Headphones */}
           <button className="p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
