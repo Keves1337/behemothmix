@@ -7,6 +7,7 @@ import Crossfader from '@/components/dj/Crossfader';
 import TrackLibrary from '@/components/dj/TrackLibrary';
 import AutoMixPanel from '@/components/dj/AutoMixPanel';
 import EffectsPanel from '@/components/dj/EffectsPanel';
+import FrequencyAnalyzer from '@/components/dj/FrequencyAnalyzer';
 
 const Index = () => {
   const {
@@ -35,6 +36,7 @@ const Index = () => {
     deckBWaveform,
     deckARealtimeData,
     deckBRealtimeData,
+    getFrequencyData,
   } = useDJWithAudio();
 
   // Deck A handlers
@@ -198,6 +200,12 @@ const Index = () => {
             waveformData={deckAWaveform}
             realtimeData={deckARealtimeData}
           />
+          <FrequencyAnalyzer 
+            deck="a"
+            isPlaying={deckA.isPlaying}
+            hasAudio={deckAHasAudio}
+            getFrequencyData={() => getFrequencyData('a')}
+          />
           <EffectsPanel deck="a" />
         </div>
 
@@ -246,6 +254,12 @@ const Index = () => {
             hasAudio={deckBHasAudio}
             waveformData={deckBWaveform}
             realtimeData={deckBRealtimeData}
+          />
+          <FrequencyAnalyzer 
+            deck="b"
+            isPlaying={deckB.isPlaying}
+            hasAudio={deckBHasAudio}
+            getFrequencyData={() => getFrequencyData('b')}
           />
           <EffectsPanel deck="b" />
         </div>
