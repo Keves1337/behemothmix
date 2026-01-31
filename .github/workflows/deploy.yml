@@ -32,6 +32,7 @@ jobs:
       - name: Build
         run: bun run build
         env:
+          VITE_BASE: '/behemothmix/'
           VITE_SUPABASE_URL: 'https://zfjngtqsuturvruccxvb.supabase.co'
           VITE_SUPABASE_PUBLISHABLE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpmam5ndHFzdXR1cnZydWNjeHZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NTA2MjQsImV4cCI6MjA4NTQyNjYyNH0.Ilh7YIN8XMY5tgaoDXB8rn4g7FGTa3fo-xueCLtavs4'
 
