@@ -1,12 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Track } from '@/types/dj';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Youtube, Music, Loader2, X, FolderOpen, Disc, ExternalLink } from 'lucide-react';
+import { Upload, Youtube, Music, Loader2, X, FolderOpen, Disc, ExternalLink, CheckCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ImportTracksModalProps {
   open: boolean;
@@ -24,6 +25,14 @@ interface PendingTrack {
   file?: File;
 }
 
+interface SpotifyTrackData {
+  title: string;
+  artist: string;
+  duration: number;
+  bpm: number;
+  key: string;
+}
+
 const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksModalProps) => {
   const [activeTab, setActiveTab] = useState('upload');
   const [pendingTracks, setPendingTracks] = useState<PendingTrack[]>([]);
@@ -33,6 +42,7 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
   const [albumName, setAlbumName] = useState('');
   const [artistName, setArtistName] = useState('');
   const [spotifyPlaylistInfo, setSpotifyPlaylistInfo] = useState<{title: string; thumbnail: string} | null>(null);
+  const [spotifyTracks, setSpotifyTracks] = useState<SpotifyTrackData[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,37 +165,85 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
     }
 
     setIsLoading(true);
+    setSpotifyTracks([]);
     
     try {
-      // Use Spotify's oEmbed API (no auth required)
-      const oEmbedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(spotifyUrl)}`;
-      const response = await fetch(oEmbedUrl);
+      // Call our edge function to fetch playlist data
+      const { data, error } = await supabase.functions.invoke('fetch-spotify-playlist', {
+        body: { playlistUrl: spotifyUrl }
+      });
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch playlist info');
+      if (error) {
+        throw new Error(error.message || 'Failed to fetch playlist');
       }
       
-      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
       
-      setSpotifyPlaylistInfo({
-        title: data.title || 'Unknown Playlist',
-        thumbnail: data.thumbnail_url || '',
-      });
-      
-      toast({
-        title: "Playlist found!",
-        description: `"${data.title}" - You can now add tracks manually based on this playlist`,
-      });
+      if (data.tracks && data.tracks.length > 0) {
+        setSpotifyTracks(data.tracks);
+        setSpotifyPlaylistInfo({
+          title: data.playlistName || 'Spotify Playlist',
+          thumbnail: '',
+        });
+        
+        toast({
+          title: "Playlist loaded!",
+          description: `Found ${data.tracks.length} tracks from "${data.playlistName}"`,
+        });
+      } else {
+        // Fallback to oEmbed if no tracks extracted
+        const oEmbedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(spotifyUrl)}`;
+        const response = await fetch(oEmbedUrl);
+        
+        if (response.ok) {
+          const oembedData = await response.json();
+          setSpotifyPlaylistInfo({
+            title: oembedData.title || 'Unknown Playlist',
+            thumbnail: oembedData.thumbnail_url || '',
+          });
+        }
+        
+        toast({
+          title: "Playlist found",
+          description: data.message || "Could not extract individual tracks. You may need to add them manually.",
+        });
+      }
     } catch (error) {
+      console.error('Spotify import error:', error);
       toast({
         title: "Import failed",
-        description: "Could not fetch playlist data. Check the URL and try again.",
+        description: error instanceof Error ? error.message : "Could not fetch playlist data. Check the URL and try again.",
         variant: "destructive",
       });
       setSpotifyPlaylistInfo(null);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const addSpotifyTracksToLibrary = () => {
+    if (spotifyTracks.length === 0) return;
+    
+    const newPendingTracks: PendingTrack[] = spotifyTracks.map((track, index) => ({
+      id: `spotify-${Date.now()}-${index}`,
+      title: track.title,
+      artist: track.artist,
+      bpm: track.bpm,
+      duration: track.duration,
+      key: track.key,
+    }));
+    
+    setPendingTracks(prev => [...prev, ...newPendingTracks]);
+    setSpotifyTracks([]);
+    setSpotifyPlaylistInfo(null);
+    setActiveTab('upload'); // Switch to upload tab to show pending tracks
+    
+    toast({
+      title: "Tracks added!",
+      description: `Added ${newPendingTracks.length} tracks. Click "Import" to add them to your library.`,
+    });
   };
 
   const removePendingTrack = (id: string) => {
@@ -371,8 +429,8 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
             )}
           </TabsContent>
 
-          <TabsContent value="import-url" className="flex-1 flex flex-col min-h-0 mt-4">
-            <div className="space-y-6">
+          <TabsContent value="import-url" className="flex-1 flex flex-col min-h-0 mt-4 overflow-y-auto">
+            <div className="space-y-4">
               {/* Spotify URL */}
               <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
                 <div className="flex items-center gap-2 mb-3">
@@ -387,28 +445,60 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
                     className="flex-1"
                   />
                   <Button
-                    variant="default"
+                    onClick={handleSpotifyImport}
+                    disabled={isLoading || !spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)}
                     className="gap-2"
-                    disabled={!spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)}
-                    onClick={() => {
-                      const playlistId = spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)?.[1];
-                      if (playlistId) {
-                        // Use anchor element for reliable URI scheme handling
-                        const link = document.createElement('a');
-                        link.href = `spotify:playlist:${playlistId}`;
-                        link.click();
-                        
-                        // Fallback to web player after short delay if app doesn't open
-                        setTimeout(() => {
-                          window.open(`https://open.spotify.com/playlist/${playlistId}`, '_blank');
-                        }, 1500);
-                      }
-                    }}
                   >
-                    <ExternalLink className="w-4 h-4" />
-                    Open in Spotify
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Music className="w-4 h-4" />
+                        Fetch Tracks
+                      </>
+                    )}
                   </Button>
                 </div>
+                
+                {/* Spotify Playlist Info */}
+                {spotifyPlaylistInfo && (
+                  <div className="mt-3 p-3 bg-background/50 rounded-md">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-4 h-4 text-primary" />
+                      <span className="font-medium text-sm">{spotifyPlaylistInfo.title}</span>
+                    </div>
+                    {spotifyTracks.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-xs text-muted-foreground mb-2">
+                          {spotifyTracks.length} tracks found
+                        </div>
+                        <div className="max-h-40 overflow-y-auto space-y-1">
+                          {spotifyTracks.slice(0, 10).map((track, index) => (
+                            <div key={index} className="flex items-center gap-2 text-xs py-1 px-2 bg-muted/30 rounded">
+                              <span className="text-muted-foreground w-5">{index + 1}.</span>
+                              <span className="truncate flex-1">{track.title}</span>
+                              <span className="text-muted-foreground truncate max-w-24">{track.artist}</span>
+                              <span className="text-muted-foreground font-mono">{formatDuration(track.duration)}</span>
+                            </div>
+                          ))}
+                          {spotifyTracks.length > 10 && (
+                            <div className="text-xs text-muted-foreground text-center py-1">
+                              ...and {spotifyTracks.length - 10} more tracks
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          onClick={addSpotifyTracksToLibrary}
+                          className="w-full mt-2 gap-2"
+                          size="sm"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Add All {spotifyTracks.length} Tracks to Import Queue
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* YouTube URL */}
