@@ -6,7 +6,9 @@ import { VitePWA } from "vite-plugin-pwa";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: "/behemothmix/",
+  // Default to root for Lovable publish/preview.
+  // GitHub Pages build sets VITE_BASE to "/behemothmix/" in the workflow.
+  base: process.env.VITE_BASE || "/",
   server: {
     host: "::",
     port: 8080,
@@ -28,6 +30,7 @@ export default defineConfig(({ mode }) => ({
         background_color: "#0a0a0f",
         display: "standalone",
         orientation: "landscape",
+        // Start at the app root; the SW scope/base will be handled by Vite's base.
         start_url: "/",
         icons: [
           {
