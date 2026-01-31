@@ -317,6 +317,16 @@ export const useDJController = () => {
     setTracks(prev => [...prev, ...analyzedTracks]);
   }, []);
 
+  const editTrack = useCallback((trackId: string, title: string, artist: string) => {
+    setTracks(prev => prev.map(track => 
+      track.id === trackId ? { ...track, title, artist } : track
+    ));
+  }, []);
+
+  const deleteTrack = useCallback((trackId: string) => {
+    setTracks(prev => prev.filter(track => track.id !== trackId));
+  }, []);
+
   // Hot cue management
   const setHotCue = useCallback((deck: 'a' | 'b', cueIndex: number) => {
     const deckState = deck === 'a' ? deckA : deckB;
@@ -406,6 +416,8 @@ export const useDJController = () => {
     updateAutoMix,
     loadTrackToDeck,
     addTracks,
+    editTrack,
+    deleteTrack,
     setHotCue,
     deleteHotCue,
     setLoop,

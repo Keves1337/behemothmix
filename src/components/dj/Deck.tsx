@@ -1,4 +1,4 @@
-import { DeckState, HotCue, LoopState } from '@/types/dj';
+import { DeckState, HotCue, LoopState, Track } from '@/types/dj';
 import Waveform from './Waveform';
 import JogWheel from './JogWheel';
 import TransportControls from './TransportControls';
@@ -10,6 +10,7 @@ import LoopControls from './LoopControls';
 import BeatJumpControls from './BeatJumpControls';
 import DeckModeControls from './DeckModeControls';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 interface DeckProps {
   deckId: 'a' | 'b';
@@ -20,6 +21,7 @@ interface DeckProps {
   onSetLoop?: (beats: number) => void;
   onToggleLoop?: () => void;
   onBeatJump?: (direction: 1 | -1) => void;
+  onTrackDrop?: (track: Track) => void;
 }
 
 const Deck = ({ 
@@ -31,7 +33,34 @@ const Deck = ({
   onSetLoop,
   onToggleLoop,
   onBeatJump,
+  onTrackDrop,
 }: DeckProps) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    try {
+      const trackData = e.dataTransfer.getData('application/json');
+      if (trackData) {
+        const track: Track = JSON.parse(trackData);
+        onTrackDrop?.(track);
+      }
+    } catch (err) {
+      console.error('Failed to parse dropped track:', err);
+    }
+  };
   const handlePlay = () => {
     onStateChange({ isPlaying: !state.isPlaying });
   };
@@ -59,10 +88,16 @@ const Deck = ({
   };
 
   return (
-    <div className={cn(
-      'deck-panel flex flex-col gap-3',
-      deckId === 'a' ? 'deck-a-panel' : 'deck-b-panel'
-    )}>
+    <div 
+      className={cn(
+        'deck-panel flex flex-col gap-3 transition-all',
+        deckId === 'a' ? 'deck-a-panel' : 'deck-b-panel',
+        isDragOver && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+      )}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Deck Label & Mode Controls */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
