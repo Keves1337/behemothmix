@@ -22,6 +22,7 @@ interface DeckProps {
   onToggleLoop?: () => void;
   onBeatJump?: (direction: 1 | -1) => void;
   onTrackDrop?: (track: Track) => void;
+  hasAudio?: boolean;
 }
 
 const Deck = ({ 
@@ -34,6 +35,7 @@ const Deck = ({
   onToggleLoop,
   onBeatJump,
   onTrackDrop,
+  hasAudio,
 }: DeckProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -137,6 +139,7 @@ const Deck = ({
         track={state.track}
         bpm={state.bpm}
         position={state.position}
+        hasAudio={hasAudio}
       />
 
       {/* Waveform */}
