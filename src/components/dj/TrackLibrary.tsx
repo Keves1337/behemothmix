@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { Track } from '@/types/dj';
 import { cn } from '@/lib/utils';
-import { Search, Music, Folder, Clock, Hash } from 'lucide-react';
+import { Search, Music, Folder, Clock, Hash, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import ImportTracksModal from './ImportTracksModal';
 
 interface TrackLibraryProps {
   tracks: Track[];
   onLoadToDeck: (track: Track, deck: 'a' | 'b') => void;
+  onAddTracks?: (tracks: Track[]) => void;
 }
 
-const TrackLibrary = ({ tracks, onLoadToDeck }: TrackLibraryProps) => {
+const TrackLibrary = ({ tracks, onLoadToDeck, onAddTracks }: TrackLibraryProps) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTrack, setSelectedTrack] = useState<string | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const filteredTracks = tracks.filter(track => 
     track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -27,9 +31,20 @@ const TrackLibrary = ({ tracks, onLoadToDeck }: TrackLibraryProps) => {
     <div className="flex flex-col h-full bg-card/50 rounded-lg border border-border">
       {/* Header */}
       <div className="p-3 border-b border-border">
-        <div className="flex items-center gap-2 mb-3">
-          <Folder className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">LIBRARY</span>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Folder className="w-4 h-4 text-primary" />
+            <span className="font-semibold text-sm">LIBRARY</span>
+          </div>
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="h-7 text-xs gap-1"
+            onClick={() => setImportModalOpen(true)}
+          >
+            <Plus className="w-3 h-3" />
+            Import
+          </Button>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -118,6 +133,13 @@ const TrackLibrary = ({ tracks, onLoadToDeck }: TrackLibraryProps) => {
       <div className="px-3 py-2 border-t border-border text-xs text-muted-foreground">
         {filteredTracks.length} tracks
       </div>
+
+      {/* Import Modal */}
+      <ImportTracksModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        onImportTracks={onAddTracks || (() => {})}
+      />
     </div>
   );
 };
