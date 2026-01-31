@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Youtube, Music, Loader2, X, FolderOpen, Disc, ExternalLink, CheckCircle } from 'lucide-react';
+import { Upload, Youtube, Music, Loader2, X, FolderOpen, Disc, ExternalLink, CheckCircle, Activity } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useBPMDetector } from '@/hooks/useBPMDetector';
 
 interface ImportTracksModalProps {
   open: boolean;
@@ -23,6 +24,8 @@ interface PendingTrack {
   duration: number;
   key: string;
   file?: File;
+  bpmDetecting?: boolean;
+  bpmConfidence?: number;
 }
 
 interface SpotifyTrackData {
@@ -44,8 +47,9 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
   const [spotifyPlaylistInfo, setSpotifyPlaylistInfo] = useState<{title: string; thumbnail: string} | null>(null);
   const [spotifyTracks, setSpotifyTracks] = useState<SpotifyTrackData[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { detectBPM } = useBPMDetector();
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -64,10 +68,11 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
           id: `upload-${Date.now()}-${index}`,
           title: title.trim(),
           artist: artist.trim(),
-          bpm: 128, // Default BPM - user can edit
+          bpm: 128, // Default BPM - will be detected
           duration: 0, // Will be calculated when loaded
           key: '?',
           file,
+          bpmDetecting: true,
         });
       }
     });
@@ -83,9 +88,10 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
 
     setPendingTracks(prev => [...prev, ...newTracks]);
     
-    // Calculate durations using Audio API
-    newTracks.forEach((track) => {
+    // Calculate durations and detect BPM using Audio API
+    newTracks.forEach(async (track) => {
       if (track.file) {
+        // Get duration
         const audio = new Audio();
         audio.src = URL.createObjectURL(track.file);
         audio.onloadedmetadata = () => {
@@ -98,6 +104,42 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
           );
           URL.revokeObjectURL(audio.src);
         };
+
+        // Detect BPM
+        try {
+          const result = await detectBPM(track.file);
+          if (result) {
+            setPendingTracks(prev => 
+              prev.map(t => 
+                t.id === track.id 
+                  ? { 
+                      ...t, 
+                      bpm: result.bpm, 
+                      bpmDetecting: false,
+                      bpmConfidence: result.confidence 
+                    }
+                  : t
+              )
+            );
+          } else {
+            setPendingTracks(prev => 
+              prev.map(t => 
+                t.id === track.id 
+                  ? { ...t, bpmDetecting: false }
+                  : t
+              )
+            );
+          }
+        } catch (error) {
+          console.error('BPM detection failed:', error);
+          setPendingTracks(prev => 
+            prev.map(t => 
+              t.id === track.id 
+                ? { ...t, bpmDetecting: false }
+                : t
+            )
+          );
+        }
       }
     });
   };
@@ -406,13 +448,38 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
                             placeholder="Artist"
                           />
                           <span>•</span>
-                          <input
-                            type="number"
-                            value={track.bpm}
-                            onChange={(e) => updatePendingTrack(track.id, { bpm: Number(e.target.value) })}
-                            className="bg-transparent focus:outline-none focus:bg-background/50 rounded px-1 w-12 text-center"
-                          />
-                          <span>BPM</span>
+                          <div className="flex items-center gap-1">
+                            {track.bpmDetecting ? (
+                              <>
+                                <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                                <span className="text-primary">Detecting...</span>
+                              </>
+                            ) : (
+                              <>
+                                <input
+                                  type="number"
+                                  value={track.bpm}
+                                  onChange={(e) => updatePendingTrack(track.id, { bpm: Number(e.target.value) })}
+                                  className="bg-transparent focus:outline-none focus:bg-background/50 rounded px-1 w-12 text-center"
+                                />
+                                <span>BPM</span>
+                                {track.bpmConfidence !== undefined && (
+                                  <span 
+                                    className={`text-[10px] px-1 rounded ${
+                                      track.bpmConfidence >= 0.7 
+                                        ? 'bg-primary/20 text-primary' 
+                                        : track.bpmConfidence >= 0.4 
+                                          ? 'bg-yellow-500/20 text-yellow-500' 
+                                          : 'bg-muted text-muted-foreground'
+                                    }`}
+                                    title={`Detection confidence: ${Math.round(track.bpmConfidence * 100)}%`}
+                                  >
+                                    {track.bpmConfidence >= 0.7 ? '✓' : '~'}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
                           <span>•</span>
                           <span>{formatDuration(track.duration)}</span>
                         </div>
