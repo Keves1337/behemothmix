@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useDJController } from '@/hooks/useDJController';
 import { useDDJSX1 } from '@/hooks/useDDJSX1';
 import Header from '@/components/dj/Header';
@@ -23,101 +23,130 @@ const Index = () => {
     addTracks,
   } = useDJController();
 
-  // MIDI action handlers
-  const midiActions = {
-    // Deck A
-    onDeckAPlay: useCallback(() => {
-      updateDeckA({ isPlaying: !deckA.isPlaying });
-    }, [deckA.isPlaying, updateDeckA]),
-    
-    onDeckACue: useCallback(() => {
-      updateDeckA({ position: deckA.cuePoint });
-    }, [deckA.cuePoint, updateDeckA]),
-    
-    onDeckASync: useCallback(() => {
-      updateDeckA({ isSynced: !deckA.isSynced });
-    }, [deckA.isSynced, updateDeckA]),
-    
-    onDeckAJog: useCallback((direction: number, velocity: number) => {
-      const nudge = direction * velocity * 0.1;
-      updateDeckA({ position: Math.max(0, deckA.position + nudge) });
-    }, [deckA.position, updateDeckA]),
-    
-    onDeckAPitch: useCallback((value: number) => {
-      updateDeckA({ pitch: value });
-    }, [updateDeckA]),
-    
-    onDeckAVolume: useCallback((value: number) => {
-      updateDeckA({ volume: value });
-    }, [updateDeckA]),
-    
-    onDeckAEQHigh: useCallback((value: number) => {
-      updateDeckA({ eq: { ...deckA.eq, high: value } });
-    }, [deckA.eq, updateDeckA]),
-    
-    onDeckAEQMid: useCallback((value: number) => {
-      updateDeckA({ eq: { ...deckA.eq, mid: value } });
-    }, [deckA.eq, updateDeckA]),
-    
-    onDeckAEQLow: useCallback((value: number) => {
-      updateDeckA({ eq: { ...deckA.eq, low: value } });
-    }, [deckA.eq, updateDeckA]),
-    
-    onDeckAFilter: useCallback((value: number) => {
-      updateDeckA({ filter: value });
-    }, [updateDeckA]),
+  // Deck A handlers
+  const onDeckAPlay = useCallback(() => {
+    updateDeckA({ isPlaying: !deckA.isPlaying });
+  }, [deckA.isPlaying, updateDeckA]);
+  
+  const onDeckACue = useCallback(() => {
+    updateDeckA({ position: deckA.cuePoint });
+  }, [deckA.cuePoint, updateDeckA]);
+  
+  const onDeckASync = useCallback(() => {
+    updateDeckA({ isSynced: !deckA.isSynced });
+  }, [deckA.isSynced, updateDeckA]);
+  
+  const onDeckAJog = useCallback((direction: number, velocity: number) => {
+    const nudge = direction * velocity * 0.1;
+    updateDeckA({ position: Math.max(0, deckA.position + nudge) });
+  }, [deckA.position, updateDeckA]);
+  
+  const onDeckAPitch = useCallback((value: number) => {
+    updateDeckA({ pitch: value });
+  }, [updateDeckA]);
+  
+  const onDeckAVolume = useCallback((value: number) => {
+    updateDeckA({ volume: value });
+  }, [updateDeckA]);
+  
+  const onDeckAEQHigh = useCallback((value: number) => {
+    updateDeckA({ eq: { ...deckA.eq, high: value } });
+  }, [deckA.eq, updateDeckA]);
+  
+  const onDeckAEQMid = useCallback((value: number) => {
+    updateDeckA({ eq: { ...deckA.eq, mid: value } });
+  }, [deckA.eq, updateDeckA]);
+  
+  const onDeckAEQLow = useCallback((value: number) => {
+    updateDeckA({ eq: { ...deckA.eq, low: value } });
+  }, [deckA.eq, updateDeckA]);
+  
+  const onDeckAFilter = useCallback((value: number) => {
+    updateDeckA({ filter: value });
+  }, [updateDeckA]);
 
-    // Deck B
-    onDeckBPlay: useCallback(() => {
-      updateDeckB({ isPlaying: !deckB.isPlaying });
-    }, [deckB.isPlaying, updateDeckB]),
-    
-    onDeckBCue: useCallback(() => {
-      updateDeckB({ position: deckB.cuePoint });
-    }, [deckB.cuePoint, updateDeckB]),
-    
-    onDeckBSync: useCallback(() => {
-      updateDeckB({ isSynced: !deckB.isSynced });
-    }, [deckB.isSynced, updateDeckB]),
-    
-    onDeckBJog: useCallback((direction: number, velocity: number) => {
-      const nudge = direction * velocity * 0.1;
-      updateDeckB({ position: Math.max(0, deckB.position + nudge) });
-    }, [deckB.position, updateDeckB]),
-    
-    onDeckBPitch: useCallback((value: number) => {
-      updateDeckB({ pitch: value });
-    }, [updateDeckB]),
-    
-    onDeckBVolume: useCallback((value: number) => {
-      updateDeckB({ volume: value });
-    }, [updateDeckB]),
-    
-    onDeckBEQHigh: useCallback((value: number) => {
-      updateDeckB({ eq: { ...deckB.eq, high: value } });
-    }, [deckB.eq, updateDeckB]),
-    
-    onDeckBEQMid: useCallback((value: number) => {
-      updateDeckB({ eq: { ...deckB.eq, mid: value } });
-    }, [deckB.eq, updateDeckB]),
-    
-    onDeckBEQLow: useCallback((value: number) => {
-      updateDeckB({ eq: { ...deckB.eq, low: value } });
-    }, [deckB.eq, updateDeckB]),
-    
-    onDeckBFilter: useCallback((value: number) => {
-      updateDeckB({ filter: value });
-    }, [updateDeckB]),
+  // Deck B handlers
+  const onDeckBPlay = useCallback(() => {
+    updateDeckB({ isPlaying: !deckB.isPlaying });
+  }, [deckB.isPlaying, updateDeckB]);
+  
+  const onDeckBCue = useCallback(() => {
+    updateDeckB({ position: deckB.cuePoint });
+  }, [deckB.cuePoint, updateDeckB]);
+  
+  const onDeckBSync = useCallback(() => {
+    updateDeckB({ isSynced: !deckB.isSynced });
+  }, [deckB.isSynced, updateDeckB]);
+  
+  const onDeckBJog = useCallback((direction: number, velocity: number) => {
+    const nudge = direction * velocity * 0.1;
+    updateDeckB({ position: Math.max(0, deckB.position + nudge) });
+  }, [deckB.position, updateDeckB]);
+  
+  const onDeckBPitch = useCallback((value: number) => {
+    updateDeckB({ pitch: value });
+  }, [updateDeckB]);
+  
+  const onDeckBVolume = useCallback((value: number) => {
+    updateDeckB({ volume: value });
+  }, [updateDeckB]);
+  
+  const onDeckBEQHigh = useCallback((value: number) => {
+    updateDeckB({ eq: { ...deckB.eq, high: value } });
+  }, [deckB.eq, updateDeckB]);
+  
+  const onDeckBEQMid = useCallback((value: number) => {
+    updateDeckB({ eq: { ...deckB.eq, mid: value } });
+  }, [deckB.eq, updateDeckB]);
+  
+  const onDeckBEQLow = useCallback((value: number) => {
+    updateDeckB({ eq: { ...deckB.eq, low: value } });
+  }, [deckB.eq, updateDeckB]);
+  
+  const onDeckBFilter = useCallback((value: number) => {
+    updateDeckB({ filter: value });
+  }, [updateDeckB]);
 
-    // Mixer
-    onCrossfader: useCallback((value: number) => {
-      updateMixer({ crossfader: value });
-    }, [updateMixer]),
-    
-    onMasterVolume: useCallback((value: number) => {
-      updateMixer({ masterVolume: value });
-    }, [updateMixer]),
-  };
+  // Mixer handlers
+  const onCrossfader = useCallback((value: number) => {
+    updateMixer({ crossfader: value });
+  }, [updateMixer]);
+  
+  const onMasterVolume = useCallback((value: number) => {
+    updateMixer({ masterVolume: value });
+  }, [updateMixer]);
+
+  // MIDI action handlers object
+  const midiActions = useMemo(() => ({
+    onDeckAPlay,
+    onDeckACue,
+    onDeckASync,
+    onDeckAJog,
+    onDeckAPitch,
+    onDeckAVolume,
+    onDeckAEQHigh,
+    onDeckAEQMid,
+    onDeckAEQLow,
+    onDeckAFilter,
+    onDeckBPlay,
+    onDeckBCue,
+    onDeckBSync,
+    onDeckBJog,
+    onDeckBPitch,
+    onDeckBVolume,
+    onDeckBEQHigh,
+    onDeckBEQMid,
+    onDeckBEQLow,
+    onDeckBFilter,
+    onCrossfader,
+    onMasterVolume,
+  }), [
+    onDeckAPlay, onDeckACue, onDeckASync, onDeckAJog, onDeckAPitch, onDeckAVolume,
+    onDeckAEQHigh, onDeckAEQMid, onDeckAEQLow, onDeckAFilter,
+    onDeckBPlay, onDeckBCue, onDeckBSync, onDeckBJog, onDeckBPitch, onDeckBVolume,
+    onDeckBEQHigh, onDeckBEQMid, onDeckBEQLow, onDeckBFilter,
+    onCrossfader, onMasterVolume,
+  ]);
 
   // Initialize DDJ-SX1 MIDI integration
   const midi = useDDJSX1(midiActions);
