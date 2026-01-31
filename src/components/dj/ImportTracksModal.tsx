@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Youtube, Music, Loader2, X, FolderOpen, Disc } from 'lucide-react';
+import { Upload, Youtube, Music, Loader2, X, FolderOpen, Disc, ExternalLink } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface ImportTracksModalProps {
@@ -410,12 +410,27 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
                       className="w-16 h-16 rounded-md object-cover"
                     />
                   )}
-                  <div>
+                  <div className="flex-1">
                     <p className="font-medium">{spotifyPlaylistInfo.title}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Playlist found! Add tracks manually based on this reference.
+                      Playlist found! Open it in your Spotify app.
                     </p>
                   </div>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="shrink-0 gap-2"
+                    onClick={() => {
+                      // Convert web URL to Spotify URI for desktop app
+                      const playlistId = spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)?.[1];
+                      if (playlistId) {
+                        window.open(`spotify:playlist:${playlistId}`, '_blank');
+                      }
+                    }}
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open in Spotify
+                  </Button>
                 </div>
               )}
 
@@ -423,8 +438,8 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
                 <p className="font-medium mb-2">How it works:</p>
                 <ul className="text-muted-foreground space-y-1 text-xs">
                   <li>• Paste a Spotify playlist share URL above</li>
-                  <li>• We'll fetch the playlist title and cover art</li>
-                  <li>• Use this as a reference to add your local MP3 files</li>
+                  <li>• Click "Fetch" to load the playlist info</li>
+                  <li>• Click "Open in Spotify" to launch it in your desktop app</li>
                   <li>• No Spotify API key required!</li>
                 </ul>
               </div>
