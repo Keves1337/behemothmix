@@ -391,6 +391,15 @@ export const useDJController = () => {
       const deckAPlaying = currentDeckA.isPlaying && currentDeckA.track;
       const deckBPlaying = currentDeckB.isPlaying && currentDeckB.track;
       
+      console.log('[AutoMix] Check:', { 
+        phase, 
+        deckAPlaying: !!deckAPlaying, 
+        deckBPlaying: !!deckBPlaying,
+        deckATrack: currentDeckA.track?.title,
+        deckBTrack: currentDeckB.track?.title,
+        tracksAvailable: tracksRef.current.length
+      });
+      
       // If neither deck is playing, nothing to do
       if (!deckAPlaying && !deckBPlaying) return;
 
@@ -439,6 +448,7 @@ export const useDJController = () => {
 
       // Auto-queue: If other deck is empty and we're idle, queue a track
       if (!otherDeck.track && phase === 'idle') {
+        console.log('[AutoMix] Scanning for next track...');
         currentPhaseRef.current = 'scanning';
         setAutoMixState(prev => ({ ...prev, currentPhase: 'scanning', isAnalyzing: true }));
         
@@ -490,17 +500,32 @@ export const useDJController = () => {
             ? determineTransitionStyle(currentTrack, analyzedTrack, playingDeck.position)
             : currentAutoMix.transitionStyle;
 
-          // Load to other deck
-          const updates = {
-            track: analyzedTrack,
-            bpm: analyzedTrack.bpm,
-            position: 0,
-            cuePoint: 0,
-            loop: defaultLoop,
-            hotCues: [],
-          };
-          setOtherDeck(prev => ({ ...prev, ...updates }));
+          // Load to other deck using the correct setter
+          console.log('[AutoMix] Loading next track:', analyzedTrack.title, 'to deck', otherDeckId);
           
+          if (otherDeckId === 'a') {
+            setDeckA(prev => ({ 
+              ...prev, 
+              track: analyzedTrack, 
+              bpm: analyzedTrack.bpm, 
+              position: 0, 
+              cuePoint: 0, 
+              loop: defaultLoop, 
+              hotCues: [] 
+            }));
+          } else {
+            setDeckB(prev => ({ 
+              ...prev, 
+              track: analyzedTrack, 
+              bpm: analyzedTrack.bpm, 
+              position: 0, 
+              cuePoint: 0, 
+              loop: defaultLoop, 
+              hotCues: [] 
+            }));
+          }
+          
+          currentPhaseRef.current = 'waiting';
           setAutoMixState(prev => ({ 
             ...prev, 
             currentPhase: 'waiting',
@@ -510,7 +535,9 @@ export const useDJController = () => {
             selectedStyle,
           }));
         } else {
-          // No available tracks
+          console.log('[AutoMix] No available tracks to queue');
+          // No available tracks - reset to idle
+          currentPhaseRef.current = 'idle';
           setAutoMixState(prev => ({ ...prev, currentPhase: 'idle', isAnalyzing: false }));
         }
         return;
@@ -524,6 +551,7 @@ export const useDJController = () => {
 
       // Start transition when entering outro
       if (timeRemaining <= outroStart && phase === 'waiting') {
+        console.log('[AutoMix] Starting transition, time remaining:', timeRemaining);
         currentPhaseRef.current = 'transitioning';
         setAutoMixState(prev => ({
           ...prev,
@@ -531,8 +559,12 @@ export const useDJController = () => {
           isAnalyzing: false,
         }));
 
-        // Start the other deck
-        setOtherDeck(prev => ({ ...prev, isPlaying: true, position: 0 }));
+        // Start the other deck using direct setter
+        if (otherDeckId === 'a') {
+          setDeckA(prev => ({ ...prev, isPlaying: true, position: 0 }));
+        } else {
+          setDeckB(prev => ({ ...prev, isPlaying: true, position: 0 }));
+        }
 
         // Begin crossfade
         const transitionSteps = currentAutoMix.transitionTime * 10;
@@ -554,12 +586,25 @@ export const useDJController = () => {
             if (transitionRef.current) clearInterval(transitionRef.current);
             transitionRef.current = null;
             
+            console.log('[AutoMix] Transition complete, stopping deck', playingDeckId);
+            
             // Stop the old deck
-            setPlayingDeck(prev => ({ ...prev, isPlaying: false }));
+            if (playingDeckId === 'a') {
+              setDeckA(prev => ({ ...prev, isPlaying: false }));
+            } else {
+              setDeckB(prev => ({ ...prev, isPlaying: false }));
+            }
             
             // Clear the old deck's track and reset state for next cycle
             setTimeout(() => {
-              setPlayingDeck(prev => ({ ...prev, track: null, position: 0 }));
+              if (playingDeckId === 'a') {
+                setDeckA(prev => ({ ...prev, track: null, position: 0 }));
+              } else {
+                setDeckB(prev => ({ ...prev, track: null, position: 0 }));
+              }
+              
+              // Reset phase to idle so next track can be queued
+              currentPhaseRef.current = 'idle';
               setAutoMixState(prev => ({ 
                 ...prev, 
                 currentPhase: 'idle', 
@@ -568,6 +613,7 @@ export const useDJController = () => {
                 queuedTrackId: null,
                 selectedStyle: null,
               }));
+              console.log('[AutoMix] Ready for next cycle');
             }, 500);
           }
         }, 100);
