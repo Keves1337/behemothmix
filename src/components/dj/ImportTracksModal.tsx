@@ -374,9 +374,9 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
           <TabsContent value="import-url" className="flex-1 flex flex-col min-h-0 mt-4">
             <div className="space-y-6">
               {/* Spotify URL */}
-              <div className="p-4 bg-[hsl(142,70%,45%)]/10 border border-[hsl(142,70%,45%)]/30 rounded-lg">
+              <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
                 <div className="flex items-center gap-2 mb-3">
-                  <Disc className="w-4 h-4 text-[hsl(142,70%,45%)]" />
+                  <Disc className="w-4 h-4 text-primary" />
                   <Label className="text-sm font-medium">Spotify Playlist</Label>
                 </div>
                 <div className="flex gap-2">
@@ -388,7 +388,7 @@ const ImportTracksModal = ({ open, onOpenChange, onImportTracks }: ImportTracksM
                   />
                   <Button
                     variant="default"
-                    className="gap-2 bg-[hsl(142,70%,45%)] hover:bg-[hsl(142,70%,40%)] text-black"
+                    className="gap-2"
                     disabled={!spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)}
                     onClick={() => {
                       const playlistId = spotifyUrl.match(/playlist\/([a-zA-Z0-9]+)/)?.[1];
