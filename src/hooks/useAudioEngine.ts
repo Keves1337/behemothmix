@@ -9,6 +9,7 @@ interface AudioDeck {
   eqLow: BiquadFilterNode | null;
   filterNode: BiquadFilterNode | null;
   source: MediaElementAudioSourceNode | null;
+  analyser: AnalyserNode | null;
 }
 
 interface UseAudioEngineReturn {
@@ -24,6 +25,9 @@ interface UseAudioEngineReturn {
   setPitch: (deck: 'a' | 'b', pitch: number) => void;
   getPosition: (deck: 'a' | 'b') => number;
   isReady: (deck: 'a' | 'b') => boolean;
+  getRealtimeWaveform: (deck: 'a' | 'b') => Float32Array | null;
+  getFrequencyData: (deck: 'a' | 'b') => Uint8Array | null;
+  analyzeFullTrack: (track: Track) => Promise<number[] | null>;
   deckAHasAudio: boolean;
   deckBHasAudio: boolean;
 }
@@ -41,6 +45,7 @@ export const useAudioEngine = (): UseAudioEngineReturn => {
     eqLow: null,
     filterNode: null,
     source: null,
+    analyser: null,
   });
   
   const deckBRef = useRef<AudioDeck>({
@@ -51,6 +56,7 @@ export const useAudioEngine = (): UseAudioEngineReturn => {
     eqLow: null,
     filterNode: null,
     source: null,
+    analyser: null,
   });
 
   const [deckAHasAudio, setDeckAHasAudio] = useState(false);
@@ -77,6 +83,11 @@ export const useAudioEngine = (): UseAudioEngineReturn => {
     deck.eqMid = audioContext.createBiquadFilter();
     deck.eqLow = audioContext.createBiquadFilter();
     deck.filterNode = audioContext.createBiquadFilter();
+    
+    // Create analyser for real-time waveform
+    deck.analyser = audioContext.createAnalyser();
+    deck.analyser.fftSize = 2048;
+    deck.analyser.smoothingTimeConstant = 0.3;
 
     // Configure EQ bands
     deck.eqHigh.type = 'highshelf';
@@ -97,8 +108,9 @@ export const useAudioEngine = (): UseAudioEngineReturn => {
     deck.filterNode.frequency.value = 20000;
     deck.filterNode.Q.value = 1;
 
-    // Connect chain: source -> eqLow -> eqMid -> eqHigh -> filter -> gain -> master
-    deck.source.connect(deck.eqLow);
+    // Connect chain: source -> analyser -> eqLow -> eqMid -> eqHigh -> filter -> gain -> master
+    deck.source.connect(deck.analyser);
+    deck.analyser.connect(deck.eqLow);
     deck.eqLow.connect(deck.eqMid);
     deck.eqMid.connect(deck.eqHigh);
     deck.eqHigh.connect(deck.filterNode);
@@ -271,6 +283,102 @@ export const useAudioEngine = (): UseAudioEngineReturn => {
     }
   }, []);
 
+  // Get real-time waveform data (time domain)
+  const getRealtimeWaveform = useCallback((deckId: 'a' | 'b'): Float32Array | null => {
+    const deck = deckId === 'a' ? deckARef.current : deckBRef.current;
+    if (!deck.analyser) return null;
+    
+    const dataArray = new Float32Array(deck.analyser.frequencyBinCount);
+    deck.analyser.getFloatTimeDomainData(dataArray);
+    return dataArray;
+  }, []);
+
+  // Get frequency data for spectrum visualization
+  const getFrequencyData = useCallback((deckId: 'a' | 'b'): Uint8Array | null => {
+    const deck = deckId === 'a' ? deckARef.current : deckBRef.current;
+    if (!deck.analyser) return null;
+    
+    const dataArray = new Uint8Array(deck.analyser.frequencyBinCount);
+    deck.analyser.getByteFrequencyData(dataArray);
+    return dataArray;
+  }, []);
+
+  // Waveform cache for analyzed tracks
+  const waveformCacheRef = useRef<Map<string, number[]>>(new Map());
+
+  // Analyze full audio file to generate static waveform overview
+  const analyzeFullTrack = useCallback(async (track: Track): Promise<number[] | null> => {
+    // Check cache first
+    if (waveformCacheRef.current.has(track.id)) {
+      return waveformCacheRef.current.get(track.id)!;
+    }
+
+    if (!track.audioFile && !track.audioUrl) {
+      return null;
+    }
+
+    try {
+      // Fetch or read the audio data
+      let arrayBuffer: ArrayBuffer;
+      
+      if (track.audioFile) {
+        arrayBuffer = await track.audioFile.arrayBuffer();
+      } else if (track.audioUrl) {
+        const response = await fetch(track.audioUrl);
+        arrayBuffer = await response.arrayBuffer();
+      } else {
+        return null;
+      }
+
+      // Create offline audio context for analysis
+      const offlineContext = new OfflineAudioContext(2, 44100 * Math.ceil(track.duration), 44100);
+      
+      // Decode audio data
+      const audioBuffer = await offlineContext.decodeAudioData(arrayBuffer);
+      
+      // Get channel data (use left channel)
+      const channelData = audioBuffer.getChannelData(0);
+      const samples = channelData.length;
+      
+      // Number of bars in waveform display
+      const numBars = 400;
+      const samplesPerBar = Math.floor(samples / numBars);
+      
+      const waveform: number[] = [];
+      
+      for (let i = 0; i < numBars; i++) {
+        const start = i * samplesPerBar;
+        const end = Math.min(start + samplesPerBar, samples);
+        
+        // Calculate RMS and peak for this segment
+        let sum = 0;
+        let peak = 0;
+        
+        for (let j = start; j < end; j++) {
+          const value = Math.abs(channelData[j]);
+          sum += value * value;
+          if (value > peak) peak = value;
+        }
+        
+        const rms = Math.sqrt(sum / (end - start));
+        const combined = (rms * 0.6 + peak * 0.4);
+        waveform.push(combined);
+      }
+
+      // Normalize
+      const maxValue = Math.max(...waveform, 0.001);
+      const normalizedWaveform = waveform.map(v => Math.min(1, (v / maxValue) * 1.2));
+
+      // Cache the result
+      waveformCacheRef.current.set(track.id, normalizedWaveform);
+      
+      return normalizedWaveform;
+    } catch (error) {
+      console.error('Error analyzing waveform:', error);
+      return null;
+    }
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -301,6 +409,9 @@ export const useAudioEngine = (): UseAudioEngineReturn => {
     setPitch,
     getPosition,
     isReady,
+    getRealtimeWaveform,
+    getFrequencyData,
+    analyzeFullTrack,
     deckAHasAudio,
     deckBHasAudio,
   };

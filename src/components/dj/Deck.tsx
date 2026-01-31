@@ -23,6 +23,8 @@ interface DeckProps {
   onBeatJump?: (direction: 1 | -1) => void;
   onTrackDrop?: (track: Track) => void;
   hasAudio?: boolean;
+  waveformData?: number[] | null;
+  realtimeData?: Float32Array | null;
 }
 
 const Deck = ({ 
@@ -36,6 +38,8 @@ const Deck = ({
   onBeatJump,
   onTrackDrop,
   hasAudio,
+  waveformData,
+  realtimeData,
 }: DeckProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -150,6 +154,9 @@ const Deck = ({
         duration={state.track?.duration || 300}
         hotCues={state.hotCues}
         loop={state.loop}
+        waveformData={waveformData}
+        realtimeData={realtimeData}
+        hasAudio={hasAudio}
       />
 
       {/* Performance Pads Section */}

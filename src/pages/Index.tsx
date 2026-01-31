@@ -31,6 +31,10 @@ const Index = () => {
     beatJump,
     deckAHasAudio,
     deckBHasAudio,
+    deckAWaveform,
+    deckBWaveform,
+    deckARealtimeData,
+    deckBRealtimeData,
   } = useDJWithAudio();
 
   // Deck A handlers
@@ -191,6 +195,8 @@ const Index = () => {
             onBeatJump={(dir) => beatJump('a', dir)}
             onTrackDrop={(track) => loadTrackToDeck(track, 'a')}
             hasAudio={deckAHasAudio}
+            waveformData={deckAWaveform}
+            realtimeData={deckARealtimeData}
           />
           <EffectsPanel deck="a" />
         </div>
@@ -238,6 +244,8 @@ const Index = () => {
             onBeatJump={(dir) => beatJump('b', dir)}
             onTrackDrop={(track) => loadTrackToDeck(track, 'b')}
             hasAudio={deckBHasAudio}
+            waveformData={deckBWaveform}
+            realtimeData={deckBRealtimeData}
           />
           <EffectsPanel deck="b" />
         </div>
