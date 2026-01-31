@@ -103,8 +103,8 @@ const Deck = ({ deckId, state, onStateChange }: DeckProps) => {
             onSync={handleSync}
           />
 
-          {/* EQ Section */}
-          <div className="flex items-start gap-6">
+          {/* EQ and Volume Section */}
+          <div className="flex items-stretch gap-6">
             <EQKnobs
               deck={deckId}
               high={state.eq.high}
