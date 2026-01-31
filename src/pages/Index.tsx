@@ -199,6 +199,7 @@ const Index = () => {
             settings={autoMix}
             state={autoMixState}
             onSettingsChange={updateAutoMix}
+            tracks={tracks}
           />
 
           {/* Crossfader */}

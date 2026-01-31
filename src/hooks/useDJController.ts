@@ -50,6 +50,7 @@ const defaultAutoMixState: AutoMixState = {
   suggestedMixPoint: null,
   transitionProgress: 0,
   nextTrackReady: false,
+  queuedTrackId: null,
 };
 
 // Generate simulated energy map for a track (energy levels per 8 beats)
@@ -200,69 +201,6 @@ export const useDJController = () => {
     return () => clearInterval(interval);
   }, [deckA.isPlaying, deckB.isPlaying]);
 
-  // Smart Auto-Mix Logic
-  useEffect(() => {
-    if (!autoMix.enabled) {
-      if (transitionRef.current) {
-        clearInterval(transitionRef.current);
-        transitionRef.current = null;
-      }
-      setAutoMixState(prev => ({ ...prev, currentPhase: 'idle', transitionProgress: 0 }));
-      return;
-    }
-
-    const checkAutoMix = () => {
-      const playingDeck = deckA.isPlaying ? deckA : deckB.isPlaying ? deckB : null;
-      const otherDeck = deckA.isPlaying ? deckB : deckA;
-      const setPlayingDeck = deckA.isPlaying ? setDeckA : setDeckB;
-      const setOtherDeck = deckA.isPlaying ? setDeckB : setDeckA;
-
-      if (!playingDeck?.track || !otherDeck?.track) return;
-
-      const timeRemaining = playingDeck.track.duration - playingDeck.position;
-      const outroStart = playingDeck.track.outroLength || 16;
-
-      // Start transition when entering outro
-      if (timeRemaining <= outroStart && autoMixState.currentPhase === 'idle') {
-        setAutoMixState(prev => ({ 
-          ...prev, 
-          currentPhase: 'transitioning',
-          isAnalyzing: false,
-        }));
-
-        // Start the other deck
-        setOtherDeck(prev => ({ ...prev, isPlaying: true, position: 0 }));
-
-        // Begin crossfade
-        const transitionSteps = autoMix.transitionTime * 10; // 10 steps per second
-        let step = 0;
-        const startCrossfader = mixer.crossfader;
-        const targetCrossfader = deckA.isPlaying ? 100 : 0;
-
-        transitionRef.current = setInterval(() => {
-          step++;
-          const progress = step / transitionSteps;
-          const newCrossfader = startCrossfader + (targetCrossfader - startCrossfader) * progress;
-          
-          setMixer(prev => ({ ...prev, crossfader: newCrossfader }));
-          setAutoMixState(prev => ({ ...prev, transitionProgress: progress * 100 }));
-
-          if (step >= transitionSteps) {
-            if (transitionRef.current) clearInterval(transitionRef.current);
-            transitionRef.current = null;
-            
-            // Stop the old deck
-            setPlayingDeck(prev => ({ ...prev, isPlaying: false }));
-            setAutoMixState(prev => ({ ...prev, currentPhase: 'idle', transitionProgress: 0 }));
-          }
-        }, 100);
-      }
-    };
-
-    const autoMixInterval = setInterval(checkAutoMix, 500);
-    return () => clearInterval(autoMixInterval);
-  }, [autoMix.enabled, deckA.isPlaying, deckB.isPlaying, deckA.position, deckB.position, deckA.track, deckB.track, autoMixState.currentPhase, mixer.crossfader, autoMix.transitionTime]);
-
   const updateDeckA = useCallback((updates: Partial<DeckState>) => {
     setDeckA(prev => ({ ...prev, ...updates }));
   }, []);
@@ -304,6 +242,195 @@ export const useDJController = () => {
       updateDeckB(updates);
     }
   }, [updateDeckA, updateDeckB]);
+
+  // Smart track selection for auto-mix
+  const selectNextTrack = useCallback((currentTrack: Track, excludeIds: string[]): Track | null => {
+    const availableTracks = tracks.filter(t => 
+      t.id !== currentTrack.id && !excludeIds.includes(t.id)
+    );
+    
+    if (availableTracks.length === 0) return null;
+
+    // Score each track based on compatibility
+    const scoredTracks = availableTracks.map(track => {
+      let score = 0;
+      
+      // Harmonic compatibility (highest priority)
+      if (autoMix.harmonic && isHarmonicMatch(currentTrack.key, track.key)) {
+        score += 50;
+      }
+      
+      // BPM compatibility (within ±6% is ideal)
+      const bpmDiff = Math.abs(currentTrack.bpm - track.bpm) / currentTrack.bpm;
+      if (bpmDiff <= 0.03) score += 40;
+      else if (bpmDiff <= 0.06) score += 25;
+      else if (bpmDiff <= 0.10) score += 10;
+      
+      // Energy matching
+      if (autoMix.energyMatch && currentTrack.energyMap && track.energyMap) {
+        const currentEnergy = currentTrack.energyMap[currentTrack.energyMap.length - 1] || 50;
+        const nextEnergy = track.energyMap[0] || 50;
+        const energyDiff = Math.abs(currentEnergy - nextEnergy);
+        if (energyDiff <= 15) score += 20;
+        else if (energyDiff <= 30) score += 10;
+      }
+      
+      // Add some randomness to prevent repetitive playlists
+      score += Math.random() * 10;
+      
+      return { track, score };
+    });
+
+    // Sort by score and pick the best
+    scoredTracks.sort((a, b) => b.score - a.score);
+    return scoredTracks[0]?.track || availableTracks[0];
+  }, [tracks, autoMix.harmonic, autoMix.energyMatch]);
+
+  // Auto-queue next track
+  const autoQueueNextTrack = useCallback((targetDeck: 'a' | 'b', currentTrack: Track | null) => {
+    if (!currentTrack) return;
+    
+    const otherDeckTrack = targetDeck === 'a' ? deckB.track : deckA.track;
+    const excludeIds = [currentTrack.id];
+    if (otherDeckTrack) excludeIds.push(otherDeckTrack.id);
+    
+    const nextTrack = selectNextTrack(currentTrack, excludeIds);
+    if (nextTrack) {
+      loadTrackToDeck(nextTrack, targetDeck);
+      setAutoMixState(prev => ({ 
+        ...prev, 
+        nextTrackReady: true,
+        queuedTrackId: nextTrack.id,
+      }));
+    }
+  }, [selectNextTrack, deckA.track, deckB.track, loadTrackToDeck]);
+
+  // Smart Auto-Mix Logic with auto-queue
+  useEffect(() => {
+    if (!autoMix.enabled) {
+      if (transitionRef.current) {
+        clearInterval(transitionRef.current);
+        transitionRef.current = null;
+      }
+      setAutoMixState(prev => ({ ...prev, currentPhase: 'idle', transitionProgress: 0, queuedTrackId: null }));
+      return;
+    }
+
+    const checkAutoMix = () => {
+      const deckAPlaying = deckA.isPlaying && deckA.track;
+      const deckBPlaying = deckB.isPlaying && deckB.track;
+      
+      // Determine which deck is the "main" playing deck
+      let playingDeck: DeckState | null = null;
+      let otherDeck: DeckState | null = null;
+      let setPlayingDeck: typeof setDeckA | null = null;
+      let setOtherDeck: typeof setDeckA | null = null;
+      let playingDeckId: 'a' | 'b' = 'a';
+      let otherDeckId: 'a' | 'b' = 'b';
+
+      if (deckAPlaying && !deckBPlaying) {
+        playingDeck = deckA;
+        otherDeck = deckB;
+        setPlayingDeck = setDeckA;
+        setOtherDeck = setDeckB;
+        playingDeckId = 'a';
+        otherDeckId = 'b';
+      } else if (deckBPlaying && !deckAPlaying) {
+        playingDeck = deckB;
+        otherDeck = deckA;
+        setPlayingDeck = setDeckB;
+        setOtherDeck = setDeckA;
+        playingDeckId = 'b';
+        otherDeckId = 'a';
+      } else if (deckAPlaying && deckBPlaying) {
+        // Both playing - use crossfader position to determine primary
+        if (mixer.crossfader < 50) {
+          playingDeck = deckA;
+          otherDeck = deckB;
+          setPlayingDeck = setDeckA;
+          setOtherDeck = setDeckB;
+          playingDeckId = 'a';
+          otherDeckId = 'b';
+        } else {
+          playingDeck = deckB;
+          otherDeck = deckA;
+          setPlayingDeck = setDeckB;
+          setOtherDeck = setDeckA;
+          playingDeckId = 'b';
+          otherDeckId = 'a';
+        }
+      }
+
+      if (!playingDeck?.track || !setPlayingDeck || !setOtherDeck) return;
+
+      // Auto-queue: If other deck is empty, queue a track
+      if (!otherDeck?.track && autoMixState.currentPhase === 'idle') {
+        setAutoMixState(prev => ({ ...prev, currentPhase: 'scanning', isAnalyzing: true }));
+        autoQueueNextTrack(otherDeckId, playingDeck.track);
+        setTimeout(() => {
+          setAutoMixState(prev => ({ ...prev, currentPhase: 'waiting', isAnalyzing: false }));
+        }, 1000);
+        return;
+      }
+
+      if (!otherDeck?.track) return;
+
+      const timeRemaining = playingDeck.track.duration - playingDeck.position;
+      const outroStart = playingDeck.track.outroLength || 16;
+
+      // Start transition when entering outro
+      if (timeRemaining <= outroStart && autoMixState.currentPhase !== 'transitioning') {
+        setAutoMixState(prev => ({ 
+          ...prev, 
+          currentPhase: 'transitioning',
+          isAnalyzing: false,
+        }));
+
+        // Start the other deck
+        setOtherDeck(prev => ({ ...prev, isPlaying: true, position: 0 }));
+
+        // Begin crossfade
+        const transitionSteps = autoMix.transitionTime * 10;
+        let step = 0;
+        const startCrossfader = mixer.crossfader;
+        const targetCrossfader = playingDeckId === 'a' ? 100 : 0;
+
+        transitionRef.current = setInterval(() => {
+          step++;
+          const progress = step / transitionSteps;
+          const newCrossfader = startCrossfader + (targetCrossfader - startCrossfader) * progress;
+          
+          setMixer(prev => ({ ...prev, crossfader: newCrossfader }));
+          setAutoMixState(prev => ({ ...prev, transitionProgress: progress * 100 }));
+
+          if (step >= transitionSteps) {
+            if (transitionRef.current) clearInterval(transitionRef.current);
+            transitionRef.current = null;
+            
+            // Stop the old deck
+            setPlayingDeck!(prev => ({ ...prev, isPlaying: false }));
+            
+            // Clear the old deck's track and queue next track for it
+            setTimeout(() => {
+              setPlayingDeck!(prev => ({ ...prev, track: null, position: 0 }));
+              setAutoMixState(prev => ({ 
+                ...prev, 
+                currentPhase: 'idle', 
+                transitionProgress: 0,
+                nextTrackReady: false,
+                queuedTrackId: null,
+              }));
+            }, 500);
+          }
+        }, 100);
+      }
+    };
+
+    const autoMixInterval = setInterval(checkAutoMix, 500);
+    return () => clearInterval(autoMixInterval);
+  }, [autoMix.enabled, deckA.isPlaying, deckB.isPlaying, deckA.position, deckB.position, 
+      deckA.track, deckB.track, autoMixState.currentPhase, mixer.crossfader, 
+      autoMix.transitionTime, autoQueueNextTrack]);
 
   const addTracks = useCallback((newTracks: Track[]) => {
     const analyzedTracks = newTracks.map(track => ({

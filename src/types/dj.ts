@@ -78,6 +78,7 @@ export interface AutoMixState {
   suggestedMixPoint: number | null;
   transitionProgress: number;
   nextTrackReady: boolean;
+  queuedTrackId: string | null;
 }
 
 export interface EffectState {

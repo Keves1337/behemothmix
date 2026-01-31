@@ -1,14 +1,16 @@
 import { cn } from '@/lib/utils';
-import { Zap, Clock, Shuffle, Brain, Music2, Waves, Activity } from 'lucide-react';
-import { AutoMixSettings, AutoMixState } from '@/types/dj';
+import { Zap, Clock, Shuffle, Brain, Music2, Waves, Activity, ListMusic } from 'lucide-react';
+import { AutoMixSettings, AutoMixState, Track } from '@/types/dj';
 
 interface AutoMixPanelProps {
   settings: AutoMixSettings;
   state?: AutoMixState;
   onSettingsChange: (settings: Partial<AutoMixSettings>) => void;
+  tracks?: Track[];
 }
 
-const AutoMixPanel = ({ settings, state, onSettingsChange }: AutoMixPanelProps) => {
+const AutoMixPanel = ({ settings, state, onSettingsChange, tracks }: AutoMixPanelProps) => {
+  const queuedTrack = tracks?.find(t => t.id === state?.queuedTrackId);
   const transitionStyles: { id: AutoMixSettings['transitionStyle']; label: string; icon: React.ReactNode }[] = [
     { id: 'crossfade', label: 'Fade', icon: <Waves className="w-3 h-3" /> },
     { id: 'beatmatch', label: 'Beat', icon: <Activity className="w-3 h-3" /> },
@@ -41,28 +43,45 @@ const AutoMixPanel = ({ settings, state, onSettingsChange }: AutoMixPanelProps) 
 
       {/* Status indicator */}
       {settings.enabled && state && (
-        <div className="mb-4 p-2 rounded bg-muted/30">
+        <div className="mb-4 p-2 rounded bg-muted/30 space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Status:</span>
             <span className={cn(
               'font-semibold uppercase',
               state.currentPhase === 'transitioning' && 'text-[hsl(var(--sync-active))]',
-              state.currentPhase === 'scanning' && 'text-primary',
+              state.currentPhase === 'scanning' && 'text-primary animate-pulse',
+              state.currentPhase === 'waiting' && 'text-primary',
               state.currentPhase === 'idle' && 'text-muted-foreground'
             )}>
               {state.currentPhase === 'idle' && 'Ready'}
-              {state.currentPhase === 'scanning' && 'Analyzing...'}
+              {state.currentPhase === 'scanning' && 'Finding next...'}
+              {state.currentPhase === 'waiting' && 'Next queued'}
               {state.currentPhase === 'transitioning' && 'Mixing...'}
             </span>
           </div>
+          
+          {/* Queued track display */}
+          {queuedTrack && (state.currentPhase === 'waiting' || state.currentPhase === 'transitioning') && (
+            <div className="flex items-center gap-2 text-xs bg-primary/10 rounded p-1.5">
+              <ListMusic className="w-3 h-3 text-primary flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="font-medium truncate text-foreground">{queuedTrack.title}</p>
+                <p className="text-muted-foreground truncate">{queuedTrack.artist} • {queuedTrack.bpm} BPM</p>
+              </div>
+            </div>
+          )}
+          
           {state.currentPhase === 'transitioning' && (
-            <div className="mt-2">
-              <div className="h-1 bg-muted rounded-full overflow-hidden">
+            <div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-gradient-to-r from-deck-a to-deck-b transition-all"
                   style={{ width: `${state.transitionProgress}%` }}
                 />
               </div>
+              <p className="text-[10px] text-muted-foreground text-center mt-1">
+                {Math.round(state.transitionProgress)}% complete
+              </p>
             </div>
           )}
         </div>
